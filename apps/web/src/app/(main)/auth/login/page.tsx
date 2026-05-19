@@ -35,9 +35,9 @@ function LoginInner() {
   function routeByRole(role: string) {
     if (next && next.startsWith('/')) { router.push(next); return; }
     if (role === 'ADMIN') {
-      window.location.href = 'http://localhost:3002/';
+      window.location.href = 'https://admin.vrindaonline.com/';
     } else if (role === 'VENDOR') {
-      window.location.href = 'http://localhost:3001/';
+      window.location.href = 'https://vendor.vrindaonline.com/';
     } else {
       router.push('/products');
     }
