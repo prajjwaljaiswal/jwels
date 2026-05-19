@@ -13,9 +13,16 @@
     "dev:admin": "npm run dev --workspace=admin",
     "db:migrate": "npm run prisma:migrate --workspace=api",
     "db:studio": "npm run prisma:studio --workspace=api",
+    "build:api": "npm run build --workspace=api",
     "build:web": "npm run build --workspace=web",
     "build:vendor": "npm run build --workspace=vendor",
-    "build:admin": "npm run build --workspace=admin"
+    "build:admin": "npm run build --workspace=admin",
+    "build:all": "npm run build:api && npm run build:web && npm run build:vendor && npm run build:admin",
+    "start": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop ecosystem.config.js",
+    "restart": "pm2 restart ecosystem.config.js",
+    "logs": "pm2 logs",
+    "status": "pm2 status"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"
