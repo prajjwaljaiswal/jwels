@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment — NEVER commit; copy .env.example to .env locally
+.env
+.env.local
+.env.*.local
+
+# Prisma generated artefacts (rebuilt by `prisma generate`)
+node_modules/.prisma/
+node_modules/@prisma/client/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local one-off scripts (kept out of source control by convention)
+scripts-*.ts
