@@ -29,24 +29,17 @@ import { startAutoDeliverJob } from './jobs/autoDeliver';
 
 const app = express();
 
-// CORS — open to all origins. We rely on JWT auth (Bearer header) for access
-// control, so the Origin doesn't need to be allow-listed. `origin: true` makes
-// the `cors` package echo the request's Origin header into the response, which
-// is compatible with `credentials: true` (browsers reject `*` when credentials
-// are sent).
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    exposedHeaders: ['Content-Length', 'Content-Range'],
-    maxAge: 86400,
-  })
-);
-// Explicit preflight handler so OPTIONS requests get a 204 with the headers
-// above, even for routes that don't declare an OPTIONS handler themselves.
-app.options('*', cors());
+const corsOptions: cors.CorsOptions = {
+  origin: true,           // echo request Origin — required when credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Length', 'Content-Range'],
+  maxAge: 86400,
+};
+app.use(cors(corsOptions));
+// Preflight must use the same options so browsers get matching headers
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
