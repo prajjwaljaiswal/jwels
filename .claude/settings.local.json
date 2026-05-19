@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 50)",
+      "PowerShell(npx tsc --noEmit; \"exit=$LASTEXITCODE\")",
+      "PowerShell(cd ../api; npx tsc --noEmit 2>&1 | Select-String -SimpleMatch \"abandonedCart\"; \"exit=$LASTEXITCODE\")"
+    ]
+  }
+}
