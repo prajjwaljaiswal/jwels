@@ -7,22 +7,22 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:api": "npm run dev --workspace=api",
-    "dev:web": "npm run dev --workspace=web",
-    "dev:vendor": "npm run dev --workspace=vendor",
-    "dev:admin": "npm run dev --workspace=admin",
-    "db:migrate": "npm run prisma:migrate --workspace=api",
-    "db:studio": "npm run prisma:studio --workspace=api",
-    "build:api": "npm run build --workspace=api",
-    "build:web": "npm run build --workspace=web",
-    "build:vendor": "npm run build --workspace=vendor",
-    "build:admin": "npm run build --workspace=admin",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:vendor": "npm run dev --workspace=apps/vendor",
+    "dev:admin": "npm run dev --workspace=apps/admin",
+    "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:studio": "npm run prisma:studio --workspace=apps/api",
+    "build:api": "npm run build --workspace=apps/api",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:vendor": "npm run build --workspace=apps/vendor",
+    "build:admin": "npm run build --workspace=apps/admin",
     "build:all": "npm run build:api && npm run build:web && npm run build:vendor && npm run build:admin",
-    "start": "pm2 start ecosystem.config.js",
-    "stop": "pm2 stop ecosystem.config.js",
-    "restart": "pm2 restart ecosystem.config.js",
-    "logs": "pm2 logs",
-    "status": "pm2 status"
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:logs": "pm2 logs",
+    "pm2:status": "pm2 status"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"
