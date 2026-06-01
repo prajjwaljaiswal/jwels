@@ -1,26 +1,41 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { Suspense, useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { api, setToken } from '@/lib/api';
 import { GoogleButton } from '@/components/auth/GoogleButton';
+import { useCart } from '@/lib/cart';
 
-export default function SellRegisterPage() {
+export default function RegisterPage() {
   return (
     <Suspense fallback={null}>
-      <Inner />
+      <RegisterInner />
     </Suspense>
   );
 }
 
-function Inner() {
+function RegisterInner() {
   const router = useRouter();
-  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
+  const params = useSearchParams();
+  const initialRole = params.get('role') === 'vendor' ? 'VENDOR' : 'CUSTOMER';
+
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: initialRole as 'CUSTOMER' | 'VENDOR',
+  });
   const [showPass, setShowPass] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+
+  function routeByRole(role: string) {
+    if (role === 'VENDOR') router.push('/sell/onboard');
+    else router.push('/products');
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,12 +44,13 @@ function Inner() {
     try {
       const data = await api<{ token: string; user: { role: string } }>('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ ...form, role: 'VENDOR' }),
+        body: JSON.stringify(form),
         auth: false,
       });
       setToken(data.token);
-      toast.success('Seller account created — let’s set up your shop.');
-      router.push('/sell/onboard');
+      await useCart.getState().mergeAndHydrate();
+      toast.success('Account created — welcome!');
+      routeByRole(data.user.role);
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -48,45 +64,73 @@ function Inner() {
     try {
       const data = await api<{ token: string; user: { role: string } }>('/api/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ credential, role: 'VENDOR' }),
+        body: JSON.stringify({ credential, role: form.role }),
         auth: false,
       });
       setToken(data.token);
-      toast.success('Welcome, seller!');
-      router.push('/sell/onboard');
+      await useCart.getState().mergeAndHydrate();
+      toast.success('Account created — welcome!');
+      routeByRole(data.user.role);
     } catch (e: any) {
       setErr(e.message);
       setLoading(false);
     }
-  }, [router]);
+  }, [form.role]); // eslint-disable-line
 
   const passOk = form.password.length >= 6;
 
   return (
     <div className="max-w-container mx-auto px-6 py-10 grid lg:grid-cols-2 gap-12 items-center">
+      {/* LEFT: brand panel */}
       <div className="hidden lg:block">
         <div className="relative aspect-[5/6] rounded-md overflow-hidden bg-brand-50">
           <img
-            src="https://images.unsplash.com/photo-1617038220319-276d3cfab638?w=900&q=80"
+            src="https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=900&q=80"
             alt=""
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
-            <p className="font-display text-3xl text-white leading-tight">Open your jewelry shop.</p>
-            <p className="text-white/80 text-sm mt-1">Weekly payouts · KYC-verified marketplace.</p>
+            <p className="font-display text-3xl text-white leading-tight">
+              Join thousands of jewelry lovers.
+            </p>
+            <p className="text-white/80 text-sm mt-1">A few details and your shopping (or selling) starts.</p>
           </div>
         </div>
       </div>
 
+      {/* RIGHT: form card */}
       <div className="max-w-md w-full mx-auto">
         <div className="bg-surface border border-line rounded-md shadow-card p-7 md:p-9">
-          <h1 className="font-display text-3xl text-ink-900">Become a seller</h1>
+          <h1 className="font-display text-3xl text-ink-900">Create your account</h1>
           <p className="text-sm text-ink-700 mt-1.5 mb-5">
-            Already selling on Jewel?{' '}
-            <Link href="/sell/login" className="text-brand-700 font-semibold hover:underline">
+            Already a member?{' '}
+            <Link href="/login" className="text-brand-700 font-semibold hover:underline">
               Sign in
             </Link>
           </p>
+
+          {/* Role toggle */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-canvas border border-line rounded-pill mb-6">
+            {[
+              { id: 'CUSTOMER', label: 'I want to buy' },
+              { id: 'VENDOR', label: 'I want to sell' },
+            ].map((opt) => {
+              const active = form.role === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, role: opt.id as 'CUSTOMER' | 'VENDOR' })}
+                  className={[
+                    'h-9 rounded-pill text-sm font-semibold transition',
+                    active ? 'bg-surface text-ink-900 shadow-card' : 'text-ink-700 hover:text-ink-900',
+                  ].join(' ')}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
 
           <GoogleButton text="signup_with" onCredential={onGoogle} disabled={loading} />
 
@@ -108,9 +152,9 @@ function Inner() {
                 value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
             </label>
             <label className="block">
-              <span className="block text-xs uppercase tracking-wide font-semibold text-ink-700 mb-1.5">Phone</span>
+              <span className="block text-xs uppercase tracking-wide font-semibold text-ink-700 mb-1.5">Phone <span className="text-ink-500 font-normal normal-case">(optional)</span></span>
               <input className="input-field" inputMode="numeric" autoComplete="tel" placeholder="10-digit mobile"
-                value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
+                value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </label>
             <label className="block">
               <span className="flex items-center justify-between mb-1.5">
@@ -119,8 +163,7 @@ function Inner() {
                   {showPass ? 'Hide' : 'Show'}
                 </button>
               </span>
-              <input className="input-field" type={showPass ? 'text' : 'password'} autoComplete="new-password"
-                placeholder="At least 6 characters"
+              <input className="input-field" type={showPass ? 'text' : 'password'} autoComplete="new-password" placeholder="At least 6 characters"
                 value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required minLength={6} />
               {form.password.length > 0 && (
                 <p className={`text-xs mt-1.5 ${passOk ? 'text-success' : 'text-ink-500'}`}>
@@ -129,21 +172,19 @@ function Inner() {
               )}
             </label>
 
-            {err && <div className="rounded-md bg-red-50 border border-red-100 text-danger text-sm p-3">{err}</div>}
+            {err && (
+              <div className="rounded-md bg-red-50 border border-red-100 text-danger text-sm p-3">{err}</div>
+            )}
 
             <button disabled={loading} className="btn-primary w-full !py-3">
-              {loading ? 'Creating account…' : 'Create seller account'}
+              {loading ? 'Creating account…' : 'Create account'}
             </button>
           </form>
 
           <p className="text-[11px] text-ink-500 text-center mt-5">
-            By creating a seller account, you agree to Jewel's Seller Terms and Privacy Policy.
+            By creating an account, you agree to Jewel's Terms and Privacy Policy.
           </p>
         </div>
-
-        <p className="text-xs text-ink-500 text-center mt-4">
-          Want to buy instead? <Link href="/register" className="text-brand-700 hover:underline">Create a shopper account</Link>
-        </p>
       </div>
     </div>
   );

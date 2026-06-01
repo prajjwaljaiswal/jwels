@@ -46,10 +46,9 @@ const VENDOR_TICKER = [
   'Contemporary studios',
 ];
 
-// Honest commission-model value pillars (no fabricated counts)
 const PILLARS = [
   { title: '₹0', suffix: '', label: 'No listing fee — open your shop free.' },
-  { title: '10', suffix: '%', label: 'Flat commission, only on shipped orders.' },
+  { title: '24', suffix: 'h', label: 'KYC review — go live in under a day.' },
   { title: '7', suffix: 'd', label: 'Weekly direct payouts to your bank.' },
   { title: '30', suffix: 'd', label: 'Return window we help coordinate.' },
 ];
@@ -71,7 +70,7 @@ const BUYER_STEPS = [
 const SELLER_STEPS = [
   { n: '01', t: 'Open your shop in minutes', d: 'List products, photos and prices — no signup fee, no monthly bill.' },
   { n: '02', t: 'Reach jewellery buyers nationwide', d: 'We bring the buyers and run the checkout. You focus on the craft.' },
-  { n: '03', t: 'Get paid every week', d: 'Flat 10% commission, deducted only on shipped orders. Direct bank payouts.' },
+  { n: '03', t: 'Get paid every week', d: 'Direct bank payouts every week for delivered orders. No delays, no minimums.' },
 ];
 
 // Honest "Our promise" pillars (replaces fake testimonial section)
@@ -79,12 +78,12 @@ const PROMISES = [
   {
     eyebrow: 'To buyers',
     title: 'Every piece, verified.',
-    body: 'BIS hallmarking on gold, IGI/SGL certification on stones, and clear photos of the actual product you receive. If it doesn’t match, we refund — full stop.',
+    body: "BIS hallmarking on gold, IGI/SGL certification on stones, and clear photos of the actual product you receive. If it doesn't match, we refund — full stop.",
   },
   {
     eyebrow: 'To artisans',
     title: 'You keep what you earn.',
-    body: 'No listing fees. No monthly subscriptions. A single, transparent 10% commission — and only on orders that actually ship. Weekly payouts, no minimum threshold.',
+    body: 'No listing fees. No monthly subscriptions. No setup cost. Weekly payouts direct to your bank, no minimum threshold.',
   },
   {
     eyebrow: 'To the craft',
@@ -96,19 +95,15 @@ const PROMISES = [
 const FAQS = [
   {
     q: 'How much does it cost to sell on Jewel?',
-    a: 'Zero to start. There’s no listing fee, no monthly subscription, and no annual contract. You only pay a flat 10% commission, and only when an order is shipped to the buyer. If nothing sells, you owe us nothing.',
-  },
-  {
-    q: 'What does the 10% commission actually cover?',
-    a: 'Payment processing, fraud protection, secure checkout, buyer support, the storefront and search, return coordination, and your weekly Razorpay payout. There are no hidden add-ons — no featured-listing tax, no mandatory ads.',
+    a: "Zero to start. There's no listing fee, no monthly subscription, and no annual contract. Opening your shop and listing your products is completely free.",
   },
   {
     q: 'How and when do I get paid?',
-    a: 'Payouts run every week through Razorpay, direct to your bank account. Our 10% commission is deducted upfront, and we generate GST-compliant invoices for both you and your customer automatically. Every transaction is visible in your payouts dashboard.',
+    a: 'Payouts run every week through Razorpay, direct to your bank account. We generate GST-compliant invoices for both you and your customer automatically. Every transaction is visible in your payouts dashboard.',
   },
   {
     q: 'Who handles shipping and returns?',
-    a: 'You ship the product yourself; we provide pre-printed labels and integrations with Delhivery, BlueDart and India Post. If a buyer initiates a return within 30 days, we coordinate the pickup and refund flow so you don’t have to chase couriers.',
+    a: "You ship the product yourself; we provide pre-printed labels and integrations with Delhivery, BlueDart and India Post. If a buyer initiates a return within 30 days, we coordinate the pickup and refund flow so you don't have to chase couriers.",
   },
   {
     q: 'Do I need GST registration to sell?',
@@ -167,7 +162,7 @@ export default function HomePage() {
               </span>
               <div className="hidden md:flex items-center gap-3">
                 <Link
-                  href="/auth/login"
+                  href="/login"
                   className="text-sm font-medium text-ink-900 hover:text-brand-700 transition-colors px-3 py-2"
                 >
                   Sign in
@@ -451,7 +446,7 @@ export default function HomePage() {
                 Shop with confidence.
               </h3>
               <p className="text-ink-700 max-w-md">
-                Every seller is verified. Every payment is protected. If a piece doesn’t match its listing, we’ll refund you — full stop.
+                Every seller is verified. Every payment is protected. If a piece doesn't match its listing, we'll refund you — full stop.
               </p>
             </Reveal>
 
@@ -538,10 +533,10 @@ export default function HomePage() {
               <div className="bg-white rounded-2xl shadow-pop p-5 max-w-[280px]">
                 <div className="flex items-center gap-2 text-brand-700 mb-2">
                   <Sparkle />
-                  <span className="text-[10px] uppercase tracking-[0.18em] font-semibold">Founder’s note</span>
+                  <span className="text-[10px] uppercase tracking-[0.18em] font-semibold">Founder's note</span>
                 </div>
                 <p className="text-xs text-ink-700 leading-relaxed">
-                  “We built Jewel because India’s independent jewellery makers deserve better than 30% cuts and pay-to-play listings.”
+                  “We built Jewel because India's independent jewellery makers deserve better than 30% cuts and pay-to-play listings.”
                 </p>
                 <p className="text-xs font-semibold text-ink-900 mt-2">— The Jewel team</p>
               </div>
@@ -583,7 +578,7 @@ export default function HomePage() {
             </Reveal>
             <Reveal delay={450}>
               <Link
-                href="/auth/register?role=vendor"
+                href="/register?role=vendor"
                 className="inline-flex items-center gap-2 font-semibold text-ink-900 hover:text-brand-700 group"
               >
                 Open your shop — free
@@ -644,133 +639,6 @@ export default function HomePage() {
         </Marquee>
       </section>
 
-      {/* ============= PRICING — commission-only ============= */}
-      <CursorSpotlight>
-        <section
-          id="pricing"
-          className="relative py-24 md:py-36 overflow-hidden scroll-mt-10 bg-ink-900 text-white"
-        >
-          <div
-            className="absolute inset-0 pointer-events-none opacity-[0.55] animate-pan"
-            style={{
-              backgroundImage:
-                'radial-gradient(circle at 15% 25%, rgba(241,100,30,0.45), transparent 38%), radial-gradient(circle at 85% 75%, rgba(255,197,138,0.35), transparent 42%), radial-gradient(circle at 50% 50%, rgba(232,163,61,0.18), transparent 55%)',
-              backgroundSize: '200% 200%',
-            }}
-            aria-hidden="true"
-          />
-          <div
-            className="absolute inset-0 opacity-[0.05] pointer-events-none"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
-              backgroundSize: '64px 64px',
-              maskImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0.6), rgba(0,0,0,0) 70%)',
-              WebkitMaskImage: 'radial-gradient(ellipse at center, rgba(0,0,0,0.6), rgba(0,0,0,0) 70%)',
-            }}
-            aria-hidden="true"
-          />
-
-          <div className="relative max-w-[1100px] mx-auto px-6">
-            <Reveal className="text-center max-w-3xl mx-auto mb-14">
-              <p className="text-xs uppercase tracking-[0.28em] text-[#FFC58A] font-semibold mb-4 inline-block">
-                Pricing
-              </p>
-              <h2 className="font-display text-4xl md:text-6xl leading-[1.05]">
-                Free to list. <span className="text-gradient-warm italic">10% only when you sell.</span>
-              </h2>
-              <p className="text-white/70 mt-5 max-w-xl mx-auto text-lg">
-                No signup fees. No monthly subscription. No contracts. If nothing ships, you owe us nothing — that’s the whole pricing page.
-              </p>
-            </Reveal>
-
-            {/* Commission breakdown card */}
-            <Reveal delay={120}>
-              <div className="grid md:grid-cols-2 gap-6 md:gap-8 items-stretch">
-                {/* Left: what you pay */}
-                <div className="relative rounded-3xl bg-white text-ink-900 p-8 md:p-10 shadow-pop overflow-hidden">
-                  <span className="absolute -top-16 -right-16 h-48 w-48 rounded-full glow-warm pointer-events-none" />
-                  <p className="text-xs uppercase tracking-[0.22em] text-brand-700 font-semibold">What you pay</p>
-                  <div className="mt-4 flex items-baseline gap-2">
-                    <span className="font-display text-7xl md:text-8xl leading-none">10</span>
-                    <span className="font-display text-4xl text-brand-700">%</span>
-                  </div>
-                  <p className="text-sm text-ink-700 mt-3 max-w-sm">
-                    A flat commission on the final sale value — deducted automatically from your weekly payout.
-                  </p>
-                  <ul className="mt-7 space-y-3">
-                    {[
-                      ['₹0', 'to open your shop'],
-                      ['₹0', 'monthly subscription'],
-                      ['₹0', 'per listing'],
-                      ['₹0', 'to use the checkout'],
-                    ].map(([amt, label]) => (
-                      <li key={label} className="flex items-center gap-3 text-sm">
-                        <span className="font-display text-2xl text-brand-700 w-12 shrink-0">{amt}</span>
-                        <span className="text-ink-900">{label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-8 pt-6 border-t border-line">
-                    <p className="text-xs text-ink-500 uppercase tracking-[0.18em] font-semibold mb-1">Example</p>
-                    <p className="text-sm text-ink-700">
-                      You sell a ₹5,000 necklace · Jewel takes ₹500 · You receive <span className="font-semibold text-ink-900">₹4,500</span> in your next weekly payout.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right: what's included */}
-                <div className="relative rounded-3xl bg-white/5 border border-white/10 backdrop-blur p-8 md:p-10 overflow-hidden">
-                  <p className="text-xs uppercase tracking-[0.22em] text-[#FFC58A] font-semibold">What’s included</p>
-                  <h3 className="font-display text-3xl md:text-4xl mt-3 leading-tight">
-                    Everything you need to run a jewellery shop online.
-                  </h3>
-                  <ul className="mt-7 space-y-4">
-                    {[
-                      'Razorpay-secured checkout & fraud protection',
-                      'Weekly direct payouts to your bank',
-                      'GST-compliant invoices, automated',
-                      'Shipping labels (Delhivery · BlueDart · India Post)',
-                      '30-day return coordination handled by us',
-                      'Buyer support and order-status messaging',
-                      'Storefront, search, and product listings',
-                    ].map((f) => (
-                      <li key={f} className="flex items-start gap-3 text-sm text-white/90">
-                        <span className="mt-0.5 h-5 w-5 rounded-full bg-[#FFC58A]/20 text-[#FFC58A] flex items-center justify-center shrink-0">
-                          <Check />
-                        </span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-8 flex flex-wrap gap-3">
-                    <Link
-                      href="/auth/register?role=vendor"
-                      className="inline-flex items-center justify-center bg-brand-600 hover:bg-brand-700 transition rounded-pill px-6 py-3 text-sm font-semibold gap-2"
-                    >
-                      Open my shop — free
-                      <ArrowRight />
-                    </Link>
-                    <Link
-                      href="#faq"
-                      className="inline-flex items-center justify-center bg-white/10 hover:bg-white/15 border border-white/20 transition rounded-pill px-6 py-3 text-sm font-semibold"
-                    >
-                      Read the FAQ
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-
-            <Reveal delay={250} className="text-center mt-10">
-              <p className="text-sm text-white/60">
-                Payment gateway fees (~2%) are handled by Razorpay and shown on every invoice — they are not Jewel’s cut.
-              </p>
-            </Reveal>
-          </div>
-        </section>
-      </CursorSpotlight>
-
       {/* ============= FAQ ============= */}
       <section id="faq" className="max-w-3xl mx-auto px-6 py-20 md:py-28 scroll-mt-10">
         <Reveal className="text-center mb-12">
@@ -789,7 +657,7 @@ export default function HomePage() {
         <Reveal delay={300} className="mt-10 text-center">
           <p className="text-sm text-ink-700">
             Still curious?{' '}
-            <Link href="/auth/register?role=vendor" className="text-brand-700 font-semibold underline underline-offset-4 hover:no-underline">
+            <Link href="/register?role=vendor" className="text-brand-700 font-semibold underline underline-offset-4 hover:no-underline">
               Talk to our team
             </Link>
             {' '}— we usually reply within an hour.
@@ -841,7 +709,7 @@ export default function HomePage() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link href="/products" className="btn-primary">Shop now</Link>
-                  <Link href="/auth/register" className="btn-secondary">Create account</Link>
+                  <Link href="/register" className="btn-secondary">Create account</Link>
                 </div>
                 <span className="absolute -bottom-12 -right-12 h-44 w-44 rounded-full glow-warm pointer-events-none" />
               </div>
@@ -863,7 +731,7 @@ export default function HomePage() {
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    href="/auth/register?role=vendor"
+                    href="/register?role=vendor"
                     className="inline-flex items-center justify-center bg-brand-600 text-white font-semibold rounded-pill px-6 py-3 hover:bg-brand-700 transition gap-2"
                   >
                     Open your shop
@@ -896,8 +764,8 @@ export default function HomePage() {
           <div className="flex items-center gap-6 text-sm text-ink-700">
             <Link href="/products" className="hover:text-brand-700">Shop</Link>
             <Link href="#pricing" className="hover:text-brand-700">Pricing</Link>
-            <Link href="/auth/register?role=vendor" className="hover:text-brand-700">Sell</Link>
-            <Link href="/auth/login" className="hover:text-brand-700">Sign in</Link>
+            <Link href="/register?role=vendor" className="hover:text-brand-700">Sell</Link>
+            <Link href="/login" className="hover:text-brand-700">Sign in</Link>
           </div>
           <div className="text-xs text-ink-500">
             © {new Date().getFullYear()} Jewel Marketplace. All rights reserved.

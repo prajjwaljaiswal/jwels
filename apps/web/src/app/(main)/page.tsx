@@ -46,7 +46,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/products" className="btn-primary">Shop new arrivals</Link>
-              <Link href="/auth/register?role=vendor" className="btn-secondary">Become a vendor</Link>
+              <Link href="/register?role=vendor" className="btn-secondary">Become a vendor</Link>
             </div>
           </div>
           <div className="relative">
@@ -136,7 +136,7 @@ export default function HomePage() {
           <p className="text-ink-700 max-w-xl mx-auto mb-6">
             Reach thousands of jewelry lovers. We handle payments, you focus on what you make best.
           </p>
-          <Link href="/auth/register?role=vendor" className="btn-primary">Open your shop</Link>
+          <Link href="/register?role=vendor" className="btn-primary">Open your shop</Link>
         </div>
       </section>
     </div>

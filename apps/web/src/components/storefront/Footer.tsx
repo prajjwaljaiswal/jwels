@@ -16,7 +16,7 @@ const COLS = [
   {
     title: 'Sell',
     links: [
-      { label: 'Become a vendor', href: '/auth/register?role=vendor' },
+      { label: 'Become a vendor', href: '/register?role=vendor' },
       { label: 'Vendor dashboard', href: '/vendor' },
       { label: 'Vendor handbook', href: '#' },
       { label: 'Fees & payouts', href: '#' },

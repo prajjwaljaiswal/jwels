@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 const PERKS = [
   { title: 'Reach jewelry lovers', body: 'List your handcrafted pieces in front of buyers actively shopping for unique jewelry.' },
-  { title: 'Flat 10% commission', body: 'No subscriptions, no listing fees. We earn only when you sell.' },
+  { title: 'Free to list', body: 'No listing fees, no monthly subscriptions. Open your shop and start selling for free.' },
   { title: 'Weekly payouts', body: 'Earnings settle to your bank account every week once orders are delivered.' },
   { title: 'Branded storefront', body: 'Your own logo, banner, theme, and shop URL on Jewel.' },
 ];
@@ -32,7 +32,7 @@ export default function SellLandingPage() {
             <Link href="/sell/register" className="btn-primary !py-3 !px-6">Start selling</Link>
             <Link href="/sell/login" className="btn-secondary !py-3 !px-6">Sign in to your shop</Link>
           </div>
-          <p className="text-xs text-ink-500 mt-3">No setup fees · Flat 10% commission · Weekly payouts</p>
+          <p className="text-xs text-ink-500 mt-3">No setup fees · No listing fees · Weekly payouts</p>
         </div>
         <div className="relative aspect-[5/6] rounded-md overflow-hidden bg-brand-50">
           <img

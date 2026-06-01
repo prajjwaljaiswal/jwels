@@ -126,7 +126,7 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (!id) return;
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    if (!t) { router.replace(`/auth/login?next=/orders/${id}`); return; }
+    if (!t) { router.replace(`/login?next=/orders/${id}`); return; }
     api<Order>(`/api/orders/me/${id}`, { silent: true })
       .then((o) => { setOrder(o); setLoading(false); })
       .catch(() => { setNotFound(true); setLoading(false); });

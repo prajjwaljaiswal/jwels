@@ -12,7 +12,8 @@ interface Me {
   role: 'CUSTOMER' | 'VENDOR' | 'ADMIN';
 }
 
-export function AccountMenu() {
+export function AccountMenu({ storeKey: forcedKey }: { storeKey?: string } = {}) {
+  const isStorefront = !!forcedKey;
   const router = useRouter();
   const pathname = usePathname() || '';
   const [me, setMe] = useState<Me | null>(null);
@@ -20,15 +21,18 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // When the menu is rendered inside a vendor storefront route, link to the
-  // vendor-scoped account/orders pages so the theme persists.
-  const storeMatch = useMemo(() => pathname.match(/^\/store\/([^/]+)/), [pathname]);
-  const accountHref   = storeMatch ? `/store/${storeMatch[1]}/account`   : '/account';
-  const ordersHref    = storeMatch ? `/store/${storeMatch[1]}/orders`    : '/orders';
-  const wishlistHref  = storeMatch ? `/store/${storeMatch[1]}/wishlist`  : '/account/wishlist';
-  const addressesHref = storeMatch ? `/store/${storeMatch[1]}/addresses` : '/account/addresses';
-  const loginHref     = storeMatch ? `/auth/login?next=${encodeURIComponent(pathname)}` : '/auth/login';
-  const registerHref  = storeMatch ? `/auth/register?next=${encodeURIComponent(pathname)}` : '/auth/register';
+  // When inside a vendor storefront, link to vendor-scoped pages so theme persists.
+  // forcedKey is passed directly from the storefront layout (avoids regex in that app).
+  const storeMatch = useMemo(
+    () => forcedKey ? [null, forcedKey] : pathname.match(/^\/store\/([^/]+)/),
+    [forcedKey, pathname],
+  );
+  const accountHref   = storeMatch ? `/${storeMatch[1]}/account`   : '/account';
+  const ordersHref    = storeMatch ? `/${storeMatch[1]}/orders`    : '/orders';
+  const wishlistHref  = storeMatch ? `/${storeMatch[1]}/wishlist`  : '/account/wishlist';
+  const addressesHref = storeMatch ? `/${storeMatch[1]}/addresses` : '/account/addresses';
+  const loginHref     = storeMatch ? `/login?next=${encodeURIComponent(pathname)}` : '/login';
+  const registerHref  = storeMatch ? `/register?next=${encodeURIComponent(pathname)}` : '/register';
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem(process.env.NEXT_PUBLIC_TOKEN_KEY || 'token') : null;

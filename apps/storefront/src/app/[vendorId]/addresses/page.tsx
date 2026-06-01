@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { addressApi, type Address, type AddressInput } from '@/lib/addresses';
 import { AddressForm } from '@/components/AddressForm';
 
-export default function AddressesPage() {
+export default function VendorAddressesPage() {
+  const { vendorId } = useParams<{ vendorId: string }>();
   const router = useRouter();
   const [items, setItems] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,12 +15,12 @@ export default function AddressesPage() {
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    if (!t) { router.replace('/login?next=/account/addresses'); return; }
+    if (!t) { router.replace(`/login?next=/${vendorId}/addresses`); return; }
     addressApi.list()
       .then((r) => setItems(r.items))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, vendorId]);
 
   async function onCreate(input: AddressInput) {
     const created = await addressApi.create(input);
@@ -34,8 +35,7 @@ export default function AddressesPage() {
   async function onUpdate(id: string, input: AddressInput) {
     const updated = await addressApi.update(id, input);
     setItems((cur) =>
-      cur
-        .map((a) => (a.id === id ? updated : updated.isDefault ? { ...a, isDefault: false } : a))
+      cur.map((a) => (a.id === id ? updated : updated.isDefault ? { ...a, isDefault: false } : a))
         .sort((a, b) => Number(b.isDefault) - Number(a.isDefault)),
     );
     setEditing(null);
@@ -45,11 +45,10 @@ export default function AddressesPage() {
   async function onMakeDefault(id: string) {
     await addressApi.setDefault(id);
     setItems((cur) =>
-      cur
-        .map((a) => ({ ...a, isDefault: a.id === id }))
+      cur.map((a) => ({ ...a, isDefault: a.id === id }))
         .sort((a, b) => Number(b.isDefault) - Number(a.isDefault)),
     );
-    toast.success('Default address updated');
+    toast.success('Default updated');
   }
 
   async function onDelete(id: string) {
@@ -60,9 +59,9 @@ export default function AddressesPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className="max-w-3xl mx-auto px-5 py-8">
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="font-display text-3xl text-ink-900">Addresses</h1>
+        <h1 className="font-display text-3xl">Saved addresses</h1>
         {!adding && (
           <button className="btn-primary" onClick={() => { setAdding(true); setEditing(null); }}>Add new</button>
         )}
@@ -79,8 +78,8 @@ export default function AddressesPage() {
         <p className="text-ink-700">Loading…</p>
       ) : items.length === 0 && !adding ? (
         <div className="text-center py-16 border border-line rounded-md bg-surface">
-          <p className="font-display text-xl text-ink-900 mb-2">No saved addresses</p>
-          <p className="text-sm text-ink-700 mb-5">Add an address to make checkout faster next time.</p>
+          <p className="font-display text-xl mb-1">No saved addresses</p>
+          <p className="text-sm text-ink-700 mb-5">Add one to make checkout faster.</p>
           <button className="btn-primary" onClick={() => setAdding(true)}>Add an address</button>
         </div>
       ) : (
@@ -98,21 +97,19 @@ export default function AddressesPage() {
                 <div className="flex justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      {a.label && <span className="font-semibold text-ink-900">{a.label}</span>}
+                      {a.label && <span className="font-semibold">{a.label}</span>}
                       {a.isDefault && (
-                        <span className="text-[11px] uppercase tracking-wide bg-brand-50 text-brand-700 border border-brand-500/40 rounded-pill px-2 py-0.5">Default</span>
+                        <span className="text-[11px] uppercase tracking-wide bg-brand-50 text-brand-700 border border-brand-600/40 rounded-pill px-2 py-0.5">Default</span>
                       )}
                     </div>
-                    <p className="text-sm text-ink-900">{a.name} · {a.phone}</p>
+                    <p className="text-sm">{a.name} · {a.phone}</p>
                     <p className="text-sm text-ink-700 mt-0.5">
                       {a.line1}{a.line2 ? `, ${a.line2}` : ''}, {a.city}, {a.state} {a.pincode}, {a.country}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
-                    <button className="text-xs text-ink-700 hover:underline" onClick={() => { setEditing(a.id); setAdding(false); }}>Edit</button>
-                    {!a.isDefault && (
-                      <button className="text-xs text-ink-700 hover:underline" onClick={() => onMakeDefault(a.id)}>Make default</button>
-                    )}
+                    <button className="text-xs hover:underline" onClick={() => { setEditing(a.id); setAdding(false); }}>Edit</button>
+                    {!a.isDefault && <button className="text-xs hover:underline" onClick={() => onMakeDefault(a.id)}>Make default</button>}
                     <button className="text-xs text-danger hover:underline" onClick={() => onDelete(a.id)}>Delete</button>
                   </div>
                 </div>

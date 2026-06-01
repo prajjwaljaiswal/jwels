@@ -121,7 +121,7 @@ export function GuestCheckoutPanel({ onContinue }: Props) {
                 <button disabled={busy} className="btn-primary">{busy ? 'Signing in…' : 'Sign in'}</button>
                 <button type="button" onClick={() => setMode('choose')} className="btn-secondary">Back</button>
               </div>
-              <Link href="/auth/login?next=/checkout" className="text-xs text-ink-700 hover:underline">Full sign-in page →</Link>
+              <Link href="/login?next=/checkout" className="text-xs text-ink-700 hover:underline">Full sign-in page →</Link>
             </div>
           </form>
         )}

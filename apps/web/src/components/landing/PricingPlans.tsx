@@ -28,7 +28,7 @@ const PLANS: Plan[] = [
     months: 1,
     discount: 0,
     variant: 'flat',
-    cta: { label: 'Start monthly', href: '/auth/register?role=vendor&plan=monthly' },
+    cta: { label: 'Start monthly', href: '/register?role=vendor&plan=monthly' },
     features: [
       'Unlimited product listings',
       'Verified vendor badge',
@@ -44,7 +44,7 @@ const PLANS: Plan[] = [
     discount: 0.10,
     tierLabel: 'Recommended',
     variant: 'recommended',
-    cta: { label: 'Choose Quarterly', href: '/auth/register?role=vendor&plan=quarterly' },
+    cta: { label: 'Choose Quarterly', href: '/register?role=vendor&plan=quarterly' },
     features: [
       'Everything in Monthly',
       'Priority chat support',
@@ -58,7 +58,7 @@ const PLANS: Plan[] = [
     months: 6,
     discount: 0.20,
     variant: 'standard',
-    cta: { label: 'Choose Half-yearly', href: '/auth/register?role=vendor&plan=halfyearly' },
+    cta: { label: 'Choose Half-yearly', href: '/register?role=vendor&plan=halfyearly' },
     features: [
       'Everything in Quarterly',
       'Featured category placement',
@@ -74,7 +74,7 @@ const PLANS: Plan[] = [
     discount: 0.30,
     tierLabel: 'Best value',
     variant: 'best-value',
-    cta: { label: 'Choose Annual', href: '/auth/register?role=vendor&plan=annual' },
+    cta: { label: 'Choose Annual', href: '/register?role=vendor&plan=annual' },
     features: [
       'Everything in Half-yearly',
       'Editor’s pick launch placement',

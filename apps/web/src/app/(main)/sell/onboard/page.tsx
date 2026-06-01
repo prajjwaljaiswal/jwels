@@ -255,7 +255,7 @@ function StepBank({ vendor, onDone }: { vendor: any; onDone: () => void }) {
   return (
     <form onSubmit={save} className="space-y-5">
       <h2 className="font-display text-2xl text-ink-900">Bank account for payouts</h2>
-      <p className="text-sm text-ink-700 -mt-2">Payouts run weekly to this account, minus our 10% commission. Account number is stored encrypted.</p>
+      <p className="text-sm text-ink-700 -mt-2">Payouts run weekly to this account. Account number is stored encrypted.</p>
 
       <Field label="Account holder name" required>
         <input className="input-field" required minLength={2}

@@ -17,7 +17,7 @@ export default function WishlistPage() {
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    if (!t) { router.replace('/auth/login?next=/account/wishlist'); return; }
+    if (!t) { router.replace('/login?next=/account/wishlist'); return; }
     hydrate().finally(() => setLoading(false));
   }, [router, hydrate]);
 

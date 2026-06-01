@@ -27,8 +27,8 @@ export function AccountMenu() {
   const ordersHref    = storeMatch ? `/store/${storeMatch[1]}/orders`    : '/orders';
   const wishlistHref  = storeMatch ? `/store/${storeMatch[1]}/wishlist`  : '/account/wishlist';
   const addressesHref = storeMatch ? `/store/${storeMatch[1]}/addresses` : '/account/addresses';
-  const loginHref     = storeMatch ? `/auth/login?next=${encodeURIComponent(pathname)}` : '/auth/login';
-  const registerHref  = storeMatch ? `/auth/register?next=${encodeURIComponent(pathname)}` : '/auth/register';
+  const loginHref     = storeMatch ? `/login?next=${encodeURIComponent(pathname)}` : '/login';
+  const registerHref  = storeMatch ? `/register?next=${encodeURIComponent(pathname)}` : '/register';
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;

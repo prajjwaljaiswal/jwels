@@ -81,7 +81,7 @@ export function ProductQA({ productId }: Props) {
         <div className="flex items-center justify-between mt-2">
           <p className="text-xs text-ink-500">
             {authed ? 'Your name will be shown with the question.' : (
-              <>You need to <Link href="/auth/login" className="text-brand-700 underline">sign in</Link> to ask a question.</>
+              <>You need to <Link href="/login" className="text-brand-700 underline">sign in</Link> to ask a question.</>
             )}
           </p>
           <button disabled={busy} className="btn-primary !py-2 !px-4 text-sm">{busy ? 'Sending…' : 'Submit question'}</button>

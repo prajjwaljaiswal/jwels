@@ -39,7 +39,7 @@ export function ProfileMenu({ variant = 'vendor' }: Props) {
     setMe(null);
     setOpen(false);
     toast.success('Signed out');
-    router.push('/auth/login');
+    router.push('/login');
     router.refresh();
   }
 
@@ -99,7 +99,7 @@ export function ProfileMenu({ variant = 'vendor' }: Props) {
             </button>
           ) : (
             <Link
-              href="/auth/login"
+              href="/login"
               onClick={() => setOpen(false)}
               className="block px-4 py-2 text-sm hover:bg-canvas border-t border-line"
             >

@@ -53,10 +53,10 @@ export default function OrdersPage() {
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    if (!t) { router.replace('/auth/login?next=/orders'); return; }
+    if (!t) { router.replace('/login?next=/orders'); return; }
     api<Order[]>('/api/orders/me', { silent: true })
       .then((d) => { setOrders(d); setLoading(false); })
-      .catch(() => { router.replace('/auth/login?next=/orders'); });
+      .catch(() => { router.replace('/login?next=/orders'); });
   }, [router]);
 
   if (loading) {

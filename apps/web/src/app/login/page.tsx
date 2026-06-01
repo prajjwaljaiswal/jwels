@@ -1,40 +1,45 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { Suspense, useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { api, setToken } from '@/lib/api';
 import { GoogleButton } from '@/components/auth/GoogleButton';
+import { useCart } from '@/lib/cart';
 
-export default function SellLoginPage() {
+const PERKS = [
+  'Discover handcrafted pieces from Indian jewelers',
+  'Track every order in one place',
+  'Hallmarked, certified, and shipped securely',
+];
+
+export default function LoginPage() {
   return (
     <Suspense fallback={null}>
-      <Inner />
+      <LoginInner />
     </Suspense>
   );
 }
 
-function Inner() {
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get('next');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function routeSeller(role: string) {
-    if (role !== 'VENDOR') {
-      setErr('This account is registered as a buyer. Sign in at /login or create a seller account.');
-      try { setToken(null); } catch {}
-      return;
-    }
-    try {
-      const ob = await api<{ submitted: boolean; nextStep: number }>('/api/vendors/me/onboarding');
-      if (!ob.submitted) router.push('/sell/onboard');
-      else router.push('/vendor');
-    } catch {
-      router.push('/sell/onboard');
+  function routeByRole(role: string) {
+    if (next && next.startsWith('/')) { router.push(next); return; }
+    if (role === 'ADMIN') {
+      window.location.href = 'https://admin.vrindaonline.com/';
+    } else if (role === 'VENDOR') {
+      window.location.href = 'https://vendor.vrindaonline.com/';
+    } else {
+      router.push('/products');
     }
   }
 
@@ -49,8 +54,9 @@ function Inner() {
         auth: false,
       });
       setToken(data.token);
+      await useCart.getState().mergeAndHydrate();
       toast.success('Welcome back!');
-      await routeSeller(data.user.role);
+      routeByRole(data.user.role);
     } catch (e: any) {
       setErr(e.message);
     } finally {
@@ -68,37 +74,42 @@ function Inner() {
         auth: false,
       });
       setToken(data.token);
+      await useCart.getState().mergeAndHydrate();
       toast.success('Welcome back!');
-      await routeSeller(data.user.role);
+      routeByRole(data.user.role);
     } catch (e: any) {
       setErr(e.message);
       setLoading(false);
     }
-  }, []); // eslint-disable-line
+  }, [router]); // eslint-disable-line
 
   return (
     <div className="max-w-container mx-auto px-6 py-10 grid lg:grid-cols-2 gap-12 items-center">
+      {/* LEFT: brand panel */}
       <div className="hidden lg:block">
         <div className="relative aspect-[5/6] rounded-md overflow-hidden bg-brand-50">
           <img
-            src="https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=900&q=80"
+            src="https://images.unsplash.com/photo-1611652022419-a9419f74343d?w=900&q=80"
             alt=""
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
-            <p className="font-display text-3xl text-white leading-tight">Back to your shop.</p>
-            <p className="text-white/80 text-sm mt-1">Manage orders, listings, and payouts.</p>
+            <p className="font-display text-3xl text-white leading-tight">
+              Welcome back to Jewel.
+            </p>
+            <p className="text-white/80 text-sm mt-1">Your favorites are right where you left them.</p>
           </div>
         </div>
       </div>
 
+      {/* RIGHT: form card */}
       <div className="max-w-md w-full mx-auto">
         <div className="bg-surface border border-line rounded-md shadow-card p-7 md:p-9">
-          <h1 className="font-display text-3xl text-ink-900">Seller sign in</h1>
+          <h1 className="font-display text-3xl text-ink-900">Sign in</h1>
           <p className="text-sm text-ink-700 mt-1.5 mb-6">
-            New to selling?{' '}
-            <Link href="/sell/register" className="text-brand-700 font-semibold hover:underline">
-              Create a seller account
+            New to Jewel?{' '}
+            <Link href="/register" className="text-brand-700 font-semibold hover:underline">
+              Create an account
             </Link>
           </p>
 
@@ -127,17 +138,30 @@ function Inner() {
                 value={password} onChange={(e) => setPassword(e.target.value)} required />
             </label>
 
-            {err && <div className="rounded-md bg-red-50 border border-red-100 text-danger text-sm p-3">{err}</div>}
+            {err && (
+              <div className="rounded-md bg-red-50 border border-red-100 text-danger text-sm p-3">{err}</div>
+            )}
 
             <button disabled={loading} className="btn-primary w-full !py-3">
-              {loading ? 'Signing in…' : 'Sign in to your shop'}
+              {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          <p className="text-[11px] text-ink-500 text-center mt-5">
+            By continuing, you agree to Jewel's Terms and Privacy Policy.
+          </p>
         </div>
 
-        <p className="text-xs text-ink-500 text-center mt-4">
-          Looking to shop? <Link href="/login" className="text-brand-700 hover:underline">Buyer sign in</Link>
-        </p>
+        <ul className="mt-6 space-y-2 px-1 lg:hidden">
+          {PERKS.map((p) => (
+            <li key={p} className="flex items-center gap-2 text-xs text-ink-700">
+              <span className="text-success">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6"/></svg>
+              </span>
+              {p}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

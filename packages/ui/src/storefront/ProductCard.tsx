@@ -36,8 +36,9 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   const hasVariationRange = comboPrices.length > 0 && minPrice !== maxPrice;
   const displayPrice = hasVariationRange ? minPrice : Number(product.price);
 
+  const storefrontBase = process.env.NEXT_PUBLIC_STOREFRONT_URL || '';
   const productHref = product.vendor.slug && product.slug
-    ? `/store/${product.vendor.slug}/${product.slug}`
+    ? `${storefrontBase}/${product.vendor.slug}/${product.slug}`
     : `/products/${product.id}`;
 
   return (
