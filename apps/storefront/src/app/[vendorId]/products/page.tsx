@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useVendor } from '@/lib/vendor-context';
 import { ProductCard, type ProductCardData } from '@/components/storefront/ProductCard';
@@ -11,11 +11,13 @@ const ALGOLIA_READY =
   !!process.env.NEXT_PUBLIC_ALGOLIA_APP_ID && !!process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
 
 export default function VendorProductsPage() {
-  const { vendorId } = useParams<{ vendorId: string }>();
   const searchParams = useSearchParams();
   const categorySlug = searchParams.get('category');
+  const { vendor } = useVendor();
+
   if (ALGOLIA_READY) {
-    return <SearchExperience vendorId={vendorId} hideVendorFacet categorySlug={categorySlug ?? undefined} />;
+    // Pass vendor.id (UUID) — not the URL slug — so the Algolia vendorId filter matches
+    return <SearchExperience vendorId={vendor.id} hideVendorFacet categorySlug={categorySlug ?? undefined} />;
   }
   return <LegacyVendorProducts categorySlug={categorySlug ?? undefined} />;
 }

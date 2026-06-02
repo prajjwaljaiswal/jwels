@@ -46,7 +46,7 @@ export function SearchExperience({ vendorId, hideVendorFacet, categorySlug }: Se
       searchClient={client}
       future={{ preserveSharedStateOnUnmount: true }}
       routing
-      initialUiState={{ [INDEX]: { toggle: { inStock: true } } }}
+      initialUiState={{}}
     >
       <Configure hitsPerPage={24} filters={filters} />
       <div className="max-w-container mx-auto px-6 py-6">

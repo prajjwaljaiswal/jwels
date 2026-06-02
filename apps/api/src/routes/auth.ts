@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { z } from 'zod';
 import { Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { requireAuth, loadPermissions } from '../middleware/auth';
+import { sendPasswordResetEmail } from '../lib/email';
 
 const router = Router();
 
@@ -172,6 +174,71 @@ router.post('/change-password', requireAuth, async (req, res) => {
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
   res.json({ ok: true });
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+  vendor: z.string().optional(),
+});
+
+router.post('/forgot-password', async (req, res) => {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  // Always return 200 to prevent email enumeration
+  const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+  if (!user) return res.json({ message: 'If that email exists, a reset link has been sent.' });
+
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+  const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordResetToken: tokenHash, passwordResetTokenExpiry: expiry },
+  });
+
+  const storefrontOrigin = process.env.STOREFRONT_ORIGIN || 'http://localhost:3002';
+  const vendorParam = parsed.data.vendor ? `&vendor=${encodeURIComponent(parsed.data.vendor)}` : '';
+  const resetLink = `${storefrontOrigin}/reset-password?token=${rawToken}${vendorParam}`;
+
+  try {
+    await sendPasswordResetEmail(user.email, resetLink);
+  } catch {
+    // Don't expose email failures to the client
+  }
+
+  res.json({ message: 'If that email exists, a reset link has been sent.' });
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(6),
+});
+
+router.post('/reset-password', async (req, res) => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { token, password } = parsed.data;
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetToken: tokenHash,
+      passwordResetTokenExpiry: { gt: new Date() },
+    },
+  });
+
+  if (!user) return res.status(400).json({ error: 'Token is invalid or has expired.' });
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, passwordResetToken: null, passwordResetTokenExpiry: null },
+  });
+
+  res.json({ message: 'Password reset successful.' });
 });
 
 export default router;

@@ -187,11 +187,20 @@ function LoginInner() {
                     style={{ color: `color-mix(in srgb, ${t.colors.text} 70%, transparent)` }}>
                     Password
                   </span>
-                  <button type="button" onClick={() => setShowPass((s) => !s)}
-                    className="text-xs hover:underline"
-                    style={{ color: `color-mix(in srgb, ${t.colors.text} 55%, transparent)` }}>
-                    {showPass ? 'Hide' : 'Show'}
-                  </button>
+                  <span className="flex items-center gap-3">
+                    <Link
+                      href={`/forgot-password${next ? `?next=${encodeURIComponent(next)}` : ''}`}
+                      className="text-xs hover:underline"
+                      style={{ color: primary }}
+                    >
+                      Forgot password?
+                    </Link>
+                    <button type="button" onClick={() => setShowPass((s) => !s)}
+                      className="text-xs hover:underline"
+                      style={{ color: `color-mix(in srgb, ${t.colors.text} 55%, transparent)` }}>
+                      {showPass ? 'Hide' : 'Show'}
+                    </button>
+                  </span>
                 </span>
                 <input
                   className="w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition"
