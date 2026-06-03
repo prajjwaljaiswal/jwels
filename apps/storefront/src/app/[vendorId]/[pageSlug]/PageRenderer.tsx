@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useVendor } from '@/lib/vendor-context';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
-import VendorProductDetailRoute from '../products/[id]/page';
+import VendorProductDetailRoute from '../products/[id]/ProductDetailClient';
 import type { Block } from '@/components/blocks/types';
 
 interface PublishedPage {

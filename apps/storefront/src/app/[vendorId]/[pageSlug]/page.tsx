@@ -15,11 +15,21 @@ async function fetchPageMeta(vendorId: string, slug: string): Promise<PageMeta |
     const res = await fetch(`${API}/api/storefront-pages/${vendorId}/${slug}`, {
       next: { revalidate: 60 },
     });
-    if (!res.ok) return null;
-    return (await res.json()) as PageMeta;
-  } catch {
-    return null;
-  }
+    if (res.ok) return (await res.json()) as PageMeta;
+  } catch {}
+
+  // Slug might be a product — try the product API as fallback
+  try {
+    const res = await fetch(`${API}/api/products/${encodeURIComponent(slug)}`, {
+      next: { revalidate: 60 },
+    });
+    if (res.ok) {
+      const p = await res.json();
+      return { title: p.name, seoTitle: p.name, seoDescription: p.description ?? null, seoImageUrl: p.images?.[0] ?? null };
+    }
+  } catch {}
+
+  return null;
 }
 
 export async function generateMetadata({
