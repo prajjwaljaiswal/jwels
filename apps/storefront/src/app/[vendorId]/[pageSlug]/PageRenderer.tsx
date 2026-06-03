@@ -4,7 +4,7 @@ import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useVendor } from '@/lib/vendor-context';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
-import { LegacyVendorProductDetailPage } from '../products/[id]/LegacyPdpLayout';
+import VendorProductDetailRoute from '../products/[id]/page';
 import type { Block } from '@/components/blocks/types';
 
 interface PublishedPage {
@@ -46,7 +46,7 @@ export default function PageRenderer() {
     );
   }
 
-  if (isProduct) return <LegacyVendorProductDetailPage params={{ vendorId: vendor.id, id: pageSlug }} />;
+  if (isProduct) return <VendorProductDetailRoute params={{ vendorId: vendor.id, id: pageSlug }} />;
 
   if (!page) return <div className="px-6 py-20 text-center text-ink-500">Loading…</div>;
 
