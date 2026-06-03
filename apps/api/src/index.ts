@@ -5,6 +5,16 @@ import { assertEncryptionKeyConfigured } from './lib/crypto';
 
 assertEncryptionKeyConfigured();
 
+// Prevent PgBouncer "connection closed" noise from crashing the process.
+// Prisma auto-reconnects on the next query — these are safe to swallow.
+process.on('unhandledRejection', (reason: any) => {
+  const msg = String(reason?.message ?? reason ?? '');
+  if (msg.includes('kind: Closed') || msg.includes('Connection closed') || msg.includes('Connection pool')) {
+    return; // transient DB connection drop — ignore
+  }
+  console.error('Unhandled rejection:', reason);
+});
+
 import authRouter from './routes/auth';
 import vendorRouter from './routes/vendors';
 import productRouter from './routes/products';
