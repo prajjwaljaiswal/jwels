@@ -23,9 +23,18 @@ export async function middleware(req: NextRequest) {
     const res = await fetch(`${API_URL}/api/vendors/by-domain/${encodeURIComponent(domain)}`);
     if (res.ok) {
       const vendor = await res.json();
-      // Rewrite to the vendor store page while keeping the custom domain in the browser URL
+      const slug = vendor.slug || vendor.id;
+      const pathname = req.nextUrl.pathname;
+
+      // If the path already starts with the vendor slug (client-side navigation
+      // generates /${slug}/... links), skip the rewrite to avoid double-prefixing.
+      if (pathname.startsWith(`/${slug}`)) {
+        return NextResponse.next();
+      }
+
+      // Rewrite to the vendor store path while keeping the custom domain in the browser URL
       const url = req.nextUrl.clone();
-      url.pathname = `/${vendor.slug || vendor.id}${req.nextUrl.pathname === '/' ? '' : req.nextUrl.pathname}`;
+      url.pathname = `/${slug}${pathname === '/' ? '' : pathname}`;
       return NextResponse.rewrite(url);
     }
   } catch {
