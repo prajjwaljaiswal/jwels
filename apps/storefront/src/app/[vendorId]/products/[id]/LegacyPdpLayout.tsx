@@ -119,7 +119,8 @@ function RatingBar({ star, count, total }: { star: number; count: number; total:
 export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: string; id: string } }) {
   const router = useRouter();
   const { code } = useCurrency();
-  const { vendor, theme, storeKey } = useVendor();
+  const { vendor, theme, storeKey, themeConfig } = useVendor();
+  const t = themeConfig;
   const [product, setProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
   const [openSection, setOpenSection] = useState<string>('description');
@@ -254,7 +255,7 @@ export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: 
   const reviewCount = reviewsData?.total ?? 0;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-6xl mx-auto px-6 py-8" style={{ color: t.colors.text }}>
       <nav className="text-xs text-ink-500 mb-5">
         <Link href={`/${storeKey}`} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
         <span className="mx-1.5">/</span>
@@ -268,7 +269,8 @@ export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: 
         <ProductGallery name={product.name} images={product.images} videoUrl={product.videoUrl} />
 
         {/* INFO */}
-        <div className="lg:sticky lg:top-32 self-start space-y-5">
+        <div className="lg:sticky lg:top-32 self-start space-y-5 rounded-xl p-5"
+          style={{ background: t.colors.background, color: t.colors.text }}>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm" style={{ color: theme }}>{vendor.shopName}</span>
@@ -327,10 +329,10 @@ export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: 
                           type="button"
                           onClick={() => setSelectedOpts({ ...selectedOpts, [v.id]: o.id })}
                           disabled={!reachable}
-                          className="rounded-pill border bg-white px-4 py-1.5 text-sm font-medium transition disabled:opacity-40 disabled:line-through"
+                          className="rounded-pill border px-4 py-1.5 text-sm font-medium transition disabled:opacity-40 disabled:line-through"
                           style={active
-                            ? { borderColor: theme, color: theme, background: `${theme}10`, borderWidth: 2 }
-                            : { borderColor: '#e5e7eb', color: '#374151' }}
+                            ? { borderColor: theme, color: theme, background: `${theme}18`, borderWidth: 2 }
+                            : { borderColor: `color-mix(in srgb, ${t.colors.text} 20%, transparent)`, color: t.colors.text, background: t.colors.background }}
                         >
                           {o.value}
                         </button>
@@ -499,7 +501,7 @@ export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: 
         )}
 
         {showForm && (
-          <div className="mb-10 p-6 bg-white border border-line rounded-lg">
+          <div className="mb-10 p-6 border border-line rounded-lg" style={{ background: t.colors.background }}>
             <h3 className="font-semibold text-ink-900 mb-4">Your Review</h3>
             <form onSubmit={submitReview} className="space-y-4">
               <div>
