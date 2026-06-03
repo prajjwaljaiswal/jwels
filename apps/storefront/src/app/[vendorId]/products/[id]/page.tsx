@@ -26,16 +26,18 @@ interface SystemPagePayload {
 
 export default function VendorProductDetailRoute({ params }: { params: { vendorId: string; id: string } }) {
   const [systemPage, setSystemPage] = useState<SystemPagePayload | null | undefined>(undefined);
+  const { vendor } = useVendor();
 
-  // Probe once for a published PDP system page. 404 → legacy fallback.
+  // Probe once for a published PDP system page using the vendor UUID (more reliable than the URL slug).
   useEffect(() => {
+    if (!vendor?.id) return;
     api<SystemPagePayload>(
-      `/api/storefront-pages/${encodeURIComponent(params.vendorId)}/system/PDP`,
+      `/api/storefront-pages/${vendor.id}/system/PDP`,
       { auth: false, silent: true },
     )
       .then((p) => setSystemPage(p))
       .catch(() => setSystemPage(null));
-  }, [params.vendorId]);
+  }, [vendor?.id]);
 
   // undefined = probe in flight → cheap skeleton (avoids legacy fetching + remount)
   if (systemPage === undefined) {
@@ -65,7 +67,7 @@ function BlockRenderedPdp({
   blocks: any[];
 }) {
   const router = useRouter();
-  const { vendor, theme, storeKey } = useVendor();
+  const { vendor, theme, themeConfig, storeKey } = useVendor();
   const [product, setProduct] = useState<PdpProduct | null>(null);
   const [reviewsData, setReviewsData] = useState<PdpReviewsData | null>(null);
   const [canReview, setCanReview] = useState(false);
@@ -158,6 +160,7 @@ function BlockRenderedPdp({
     <PdpProvider
       product={product}
       theme={theme}
+      themeConfig={themeConfig}
       storeKey={storeKey}
       reviewsData={reviewsData}
       canReview={canReview}

@@ -63,6 +63,7 @@ export interface PdpReviewsData {
 interface PdpState {
   product: PdpProduct;
   theme: string;
+  themeConfig: any;
   storeKey: string;
   reviewsData: PdpReviewsData | null;
   canReview: boolean;
@@ -92,6 +93,7 @@ export function usePdp(): PdpState | null {
 interface PdpProviderProps {
   product: PdpProduct;
   theme: string;
+  themeConfig: any;
   storeKey: string;
   reviewsData: PdpReviewsData | null;
   canReview: boolean;
@@ -109,7 +111,7 @@ interface PdpProviderProps {
 }
 
 export function PdpProvider(props: PdpProviderProps) {
-  const { product, theme, storeKey, reviewsData, canReview, alreadyReviewed, reloadReviews, markReviewed, addToCart, children } = props;
+  const { product, theme, themeConfig, storeKey, reviewsData, canReview, alreadyReviewed, reloadReviews, markReviewed, addToCart, children } = props;
   const [qty, setQty] = useState(1);
   const [selectedOpts, setSelectedOpts] = useState<Record<string, string>>({});
   const [personalizationText, setPersonalizationText] = useState('');
@@ -135,6 +137,7 @@ export function PdpProvider(props: PdpProviderProps) {
     return {
       product,
       theme,
+      themeConfig,
       storeKey,
       reviewsData,
       canReview,
@@ -155,7 +158,7 @@ export function PdpProvider(props: PdpProviderProps) {
       reloadReviews,
       markReviewed,
     };
-  }, [product, theme, storeKey, reviewsData, canReview, alreadyReviewed, qty, selectedOpts, personalizationText, addToCart, reloadReviews, markReviewed]);
+  }, [product, theme, themeConfig, storeKey, reviewsData, canReview, alreadyReviewed, qty, selectedOpts, personalizationText, addToCart, reloadReviews, markReviewed]);
 
   return <PdpContext.Provider value={value}>{children}</PdpContext.Provider>;
 }
