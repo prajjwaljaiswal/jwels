@@ -179,6 +179,33 @@ enum Permission {
   PAYMENT_METHOD_MANAGE
 }
 
+enum ShipmentStatus {
+  LABEL_GENERATED
+  MANIFEST_GENERATED
+  PICKUP_SCHEDULED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  COMPLETED
+  RTO_INITIATED
+  RTO_DELIVERED
+  CANCELLED
+}
+
+enum PickupStatus {
+  REQUESTED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum ManifestStatus {
+  DRAFT
+  SUBMITTED
+  CLOSED
+}
+
 model User {
   id           String   @id @default(uuid())
   name         String
@@ -291,6 +318,9 @@ model Vendor {
   pages            VendorPage[]
   coupons          Coupon[]
   assets           VendorAsset[]
+  shipments        Shipment[]
+  manifests        Manifest[]
+  pickups          CarrierPickup[]
 }
 
 enum VendorPageKind {
@@ -840,6 +870,7 @@ model Order {
 
   items       OrderItem[]
   redemption  CouponRedemption?
+  shipments   Shipment[]
 
   @@index([customerId])
   @@index([status])
@@ -882,6 +913,8 @@ model OrderItem {
   variationComboId String?
   variationCombo   ProductVariationCombo? @relation("OrderItemCombo", fields: [variationComboId], references: [id], onDelete: SetNull)
   variationLabel   String?  // e.g. "Size: M · Metal: Gold"
+
+  shipment         Shipment?
 
   @@index([orderId])
   @@index([vendorId])
@@ -969,4 +1002,104 @@ model CouponRedemption {
 
   @@index([couponId])
   @@index([customerId])
+}
+
+// ── FULFILLMENT MODELS ───────────────────────────────────────────────────────
+
+model Shipment {
+  id            String         @id @default(uuid())
+  orderItemId   String         @unique
+  orderId       String
+  vendorId      String
+  carrierName   String
+  awb           String?
+  labelUrl      String?
+  status        ShipmentStatus @default(LABEL_GENERATED)
+  weightGrams   Int?
+  dimensions    Json?          // { lengthCm, widthCm, heightCm }
+  declaredValue Decimal?       @db.Decimal(10, 2)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  orderItem      OrderItem          @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor         Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  trackingEvents TrackingEvent[]
+  manifestItems  ManifestShipment[]
+  deliveryProof  DeliveryProof?
+
+  @@index([vendorId, status])
+  @@index([vendorId, createdAt])
+  @@index([awb])
+  @@index([orderId])
+}
+
+model Manifest {
+  id            String         @id @default(uuid())
+  vendorId      String
+  vendor        Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  carrierName   String
+  shipmentCount Int            @default(0)
+  manifestDate  DateTime       @default(now())
+  status        ManifestStatus @default(DRAFT)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  shipments ManifestShipment[]
+
+  @@index([vendorId, createdAt])
+  @@index([vendorId, status])
+}
+
+model ManifestShipment {
+  manifestId String
+  shipmentId String
+
+  manifest Manifest @relation(fields: [manifestId], references: [id], onDelete: Cascade)
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@id([manifestId, shipmentId])
+  @@index([shipmentId])
+}
+
+model CarrierPickup {
+  id            String       @id @default(uuid())
+  vendorId      String
+  vendor        Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  carrierName   String
+  pickupDate    DateTime
+  status        PickupStatus @default(REQUESTED)
+  pickupAddress Json
+  notes         String?
+  carrierRef    String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([vendorId, pickupDate])
+  @@index([vendorId, status])
+}
+
+model TrackingEvent {
+  id               String   @id @default(uuid())
+  shipmentId       String
+  shipment         Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  eventName        String
+  eventDescription String?
+  eventTime        DateTime
+  eventLocation    String?
+  rawPayload       Json?
+  createdAt        DateTime @default(now())
+
+  @@index([shipmentId, eventTime])
+}
+
+model DeliveryProof {
+  id                 String   @id @default(uuid())
+  shipmentId         String   @unique
+  shipment           Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  deliveryDate       DateTime
+  receiverName       String?
+  deliverySignature  String?
+  proofOfDeliveryUrl String?
+  createdAt          DateTime @default(now())
 }

@@ -2,10 +2,16 @@ import type { CarrierAdapter, CredentialField } from './types';
 import { delhivery } from './delhivery';
 import { shiprocket } from './shiprocket';
 import { fedex } from './fedex';
+import { dtdc } from './dtdc';
+import { bluedart } from './bluedart';
 
-// Register adapters here. Adding a new carrier = drop a file, import, and append.
+// Register adapters here. Adding a new carrier = create a file, import, and append.
+// The vendor UI auto-discovers all registered adapters: groups by category, renders
+// credential fields dynamically, and populates the service dropdown from supportedServices.
 const ADAPTERS: CarrierAdapter[] = [
   delhivery,
+  dtdc,
+  bluedart,
   shiprocket,
   fedex,
 ];
@@ -28,6 +34,8 @@ export interface CarrierManifestEntry {
   key: string;
   displayName: string;
   logoUrl?: string;
+  category: string;
+  supportedServices: import('./types').CarrierServiceDef[];
   credentialFields: CredentialField[];
   supportsCreateShipment: boolean;
   supportsTracking: boolean;
@@ -38,10 +46,12 @@ export function listCarriers(): CarrierManifestEntry[] {
     key: a.key,
     displayName: a.displayName,
     logoUrl: a.logoUrl,
+    category: a.category,
+    supportedServices: a.supportedServices,
     credentialFields: a.credentialFields,
     supportsCreateShipment: typeof a.createShipment === 'function',
     supportsTracking: typeof a.track === 'function',
   }));
 }
 
-export type { CarrierAdapter, CarrierContext, CredentialField, RateQuote, RateQuoteInput, VerifyResult } from './types';
+export type { CarrierAdapter, CarrierContext, CarrierServiceDef, CredentialField, RateQuote, RateQuoteInput, VerifyResult } from './types';

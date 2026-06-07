@@ -16,6 +16,19 @@ export async function autoDeliverShippedItems(now: Date = new Date()): Promise<n
       deliveredAt: now,
     },
   });
+
+  // Also advance any Shipment records that are still in-transit past the cutoff
+  if (result.count > 0) {
+    await prisma.shipment.updateMany({
+      where: {
+        status: { in: ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'] as any },
+        updatedAt: { lt: cutoff },
+        orderItem: { dispatchedAt: { lt: cutoff } },
+      },
+      data: { status: 'DELIVERED' as any },
+    });
+  }
+
   return result.count;
 }
 

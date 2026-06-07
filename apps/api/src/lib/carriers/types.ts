@@ -81,6 +81,17 @@ export interface CarrierContext {
   defaults?: Record<string, unknown> | null;
 }
 
+export interface CarrierServiceDef {
+  /** Carrier-specific code passed as serviceCode to createShipment / quote. */
+  code: string;
+  /** Human-readable label shown in the vendor UI service picker. */
+  name: string;
+  /** Maps to Prisma ShippingServiceType enum. */
+  serviceType: 'STANDARD' | 'EXPRESS' | 'OVERNIGHT' | 'SAME_DAY';
+  etaMinDays: number;
+  etaMaxDays: number;
+}
+
 export interface CarrierAdapter {
   /** Stable uppercase key matching VendorCarrierAccount.carrier. */
   key: string;
@@ -88,6 +99,16 @@ export interface CarrierAdapter {
   displayName: string;
   /** Optional logo URL — frontend can render a fallback if absent. */
   logoUrl?: string;
+  /**
+   * Logical group for the carrier picker UI.
+   * "DOMESTIC" | "INTERNATIONAL" | "AGGREGATOR" | "HYPERLOCAL"
+   */
+  category: string;
+  /**
+   * Services this carrier offers. Drives the service dropdown when a vendor
+   * creates a LIVE shipping method — selection auto-fills serviceType + ETA.
+   */
+  supportedServices: CarrierServiceDef[];
   /** Drives the dynamic credentials form in the vendor UI. */
   credentialFields: CredentialField[];
 

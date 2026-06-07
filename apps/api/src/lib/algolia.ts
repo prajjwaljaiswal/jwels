@@ -138,6 +138,7 @@ export async function configureIndex(): Promise<void> {
         'searchable(vendorName)',
         'filterOnly(vendorId)',
         'filterOnly(categoryId)',
+        'filterOnly(categorySlug)',
         'metalType',
         'materials',
         'tags',

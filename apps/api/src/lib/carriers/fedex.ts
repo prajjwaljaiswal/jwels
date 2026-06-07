@@ -87,6 +87,13 @@ function authHeaders(token: string): Record<string, string> {
 export const fedex: CarrierAdapter = {
   key: 'FEDEX',
   displayName: 'FedEx',
+  category: 'INTERNATIONAL',
+  supportedServices: [
+    { code: 'FEDEX_GROUND',                  name: 'FedEx Ground',            serviceType: 'STANDARD',  etaMinDays: 3, etaMaxDays: 7 },
+    { code: 'FEDEX_EXPRESS_SAVER',           name: 'FedEx Express Saver',     serviceType: 'EXPRESS',   etaMinDays: 2, etaMaxDays: 4 },
+    { code: 'FEDEX_INTERNATIONAL_PRIORITY',  name: "FedEx Int'l Priority",    serviceType: 'OVERNIGHT', etaMinDays: 1, etaMaxDays: 3 },
+    { code: 'INTERNATIONAL_ECONOMY',         name: 'FedEx Int\'l Economy',    serviceType: 'STANDARD',  etaMinDays: 4, etaMaxDays: 7 },
+  ],
 
   credentialFields: [
     { key: 'clientId',      label: 'API Key (clientId)',     type: 'secret', required: true,

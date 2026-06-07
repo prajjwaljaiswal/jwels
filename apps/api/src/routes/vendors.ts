@@ -379,6 +379,7 @@ router.get('/me/orders', requireAuth, requireRole(Role.VENDOR), async (req, res)
           customer: { select: { name: true, email: true, phone: true } },
         },
       },
+      shipment: { select: { id: true, status: true, awb: true, labelUrl: true, carrierName: true } },
     },
     orderBy: { order: { createdAt: 'desc' } },
   });
@@ -774,7 +775,7 @@ router.get('/:vendorId', async (req, res) => {
     return res.status(404).json({ error: 'Vendor not found' });
   }
   const products = await prisma.product.findMany({
-    where: { vendorId: vendor.id, isActive: true },
+    where: { vendorId: vendor.id, isActive: true, status: 'ACTIVE' },
     include: {
       category: { select: { name: true, slug: true } },
       shopSection: { select: { id: true, slug: true, name: true } },

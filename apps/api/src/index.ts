@@ -34,6 +34,7 @@ import wishlistRouter from './routes/wishlist';
 import addressRouter from './routes/addresses';
 import questionsRouter from './routes/questions';
 import collectionsRouter from './routes/collections';
+import fulfillmentRouter from './routes/fulfillment';
 import { startAbandonedCartJob } from './jobs/abandonedCart';
 import { startAutoDeliverJob } from './jobs/autoDeliver';
 
@@ -75,6 +76,7 @@ app.use('/api/wishlist', wishlistRouter);
 app.use('/api/addresses', addressRouter);
 app.use('/api/questions', questionsRouter);
 app.use('/api/collections', collectionsRouter);
+app.use('/api/fulfillment', fulfillmentRouter);
 
 // Generic error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

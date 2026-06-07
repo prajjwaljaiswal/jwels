@@ -1,5 +1,7 @@
-import { PrismaClient, Role, AttributeInputType, Permission } from '@prisma/client';
+import 'dotenv/config';
+import { PrismaClient, Role, AttributeInputType, Permission, CarrierMode, RateMode, ShippingServiceType, VendorStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { encryptJson } from '../src/lib/crypto';
 
 const prisma = new PrismaClient();
 
@@ -305,6 +307,136 @@ async function seedReviews() {
   console.log(`✓ Reviews seeded — ${created} created, ${skipped} already existed`);
 }
 
+// ─── Demo vendor with Delhivery setup ────────────────────────────────────────
+
+async function findOrCreateShippingMethod(data: Parameters<typeof prisma.shippingMethod.create>[0]['data']) {
+  const existing = await prisma.shippingMethod.findFirst({
+    where: { vendorId: data.vendorId as string, name: data.name as string, carrier: data.carrier as string },
+  });
+  if (!existing) {
+    await prisma.shippingMethod.create({ data });
+    return true;
+  }
+  return false;
+}
+
+async function seedDemoVendor() {
+  const vendorEmail = 'vendor@jewel.local';
+  const passwordHash = await bcrypt.hash('vendor123', 10);
+
+  // 1. Upsert vendor user
+  const user = await prisma.user.upsert({
+    where: { email: vendorEmail },
+    update: {},
+    create: { name: 'Demo Vendor', email: vendorEmail, passwordHash, role: Role.VENDOR },
+  });
+  console.log('✓ Demo vendor user:', user.email, '(password: vendor123)');
+
+  // 2. Upsert Vendor record
+  const vendor = await prisma.vendor.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: {
+      userId: user.id,
+      shopName: 'Jewel Demo Store',
+      slug: 'jewel-demo-store',
+      status: VendorStatus.APPROVED,
+      address: 'Mumbai, Maharashtra',
+      description: 'Demo vendor store for testing Delhivery shipping integration.',
+    },
+  });
+  console.log('✓ Demo vendor record:', vendor.shopName);
+
+  // 3. Upsert VendorAddress
+  await prisma.vendorAddress.upsert({
+    where: { vendorId: vendor.id },
+    update: {},
+    create: {
+      vendorId: vendor.id,
+      contactName: 'Demo Vendor',
+      phone: '9999999999',
+      line1: '123 Demo Street, Andheri West',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      postalCode: '400001',
+      country: 'IN',
+    },
+  });
+  console.log('✓ Demo vendor pickup address: Mumbai 400001');
+
+  // 4. Upsert Delhivery carrier account (TEST mode)
+  // Replace the placeholder token with your real Delhivery TEST API token,
+  // then run "Verify" from the vendor portal to confirm the connection.
+  const encryptedCreds = encryptJson({ apiToken: 'PASTE_YOUR_DELHIVERY_TEST_TOKEN_HERE' });
+  const carrierAccount = await prisma.vendorCarrierAccount.upsert({
+    where: {
+      vendorId_carrier_accountLabel: {
+        vendorId: vendor.id,
+        carrier: 'DELHIVERY',
+        accountLabel: 'Delhivery (Test)',
+      },
+    },
+    update: {},
+    create: {
+      vendorId: vendor.id,
+      carrier: 'DELHIVERY',
+      accountLabel: 'Delhivery (Test)',
+      mode: CarrierMode.TEST,
+      credentials: encryptedCreds,
+      defaultsJson: { pickupPincode: '400001' },
+      isActive: true,
+    },
+  });
+  console.log('✓ Delhivery TEST carrier account created (id:', carrierAccount.id + ')');
+  console.log('  → Edit from vendor UI (Shipping → Carrier Accounts) to paste your real token, then click Verify');
+
+  // 5. Flat Standard shipping method
+  const std = await findOrCreateShippingMethod({
+    vendorId: vendor.id,
+    name: 'Standard Shipping',
+    carrier: 'CUSTOM',
+    serviceType: ShippingServiceType.STANDARD,
+    rateMode: RateMode.FLAT,
+    baseRate: 50,
+    etaMinDays: 4,
+    etaMaxDays: 7,
+    zones: ['*'],
+    isActive: true,
+  });
+  if (std) console.log('✓ Flat Standard method: ₹50, 4–7 days');
+
+  // 6. Flat Express shipping method
+  const exp = await findOrCreateShippingMethod({
+    vendorId: vendor.id,
+    name: 'Express Shipping',
+    carrier: 'CUSTOM',
+    serviceType: ShippingServiceType.EXPRESS,
+    rateMode: RateMode.FLAT,
+    baseRate: 150,
+    etaMinDays: 1,
+    etaMaxDays: 3,
+    zones: ['*'],
+    isActive: true,
+  });
+  if (exp) console.log('✓ Flat Express method: ₹150, 1–3 days');
+
+  // 7. LIVE Delhivery method — inactive until the carrier account is verified
+  const live = await findOrCreateShippingMethod({
+    vendorId: vendor.id,
+    carrierAccountId: carrierAccount.id,
+    name: 'Delhivery Standard',
+    carrier: 'DELHIVERY',
+    serviceType: ShippingServiceType.STANDARD,
+    rateMode: RateMode.LIVE,
+    baseRate: 0,
+    etaMinDays: 3,
+    etaMaxDays: 6,
+    zones: ['*'],
+    isActive: false,
+  });
+  if (live) console.log('✓ LIVE Delhivery method created (inactive — enable after verifying account)');
+}
+
 async function main() {
   await seedAdmin();
   await seedAdminRoles();
@@ -316,6 +448,7 @@ async function main() {
   }
 
   await seedAttributes(categoryMap);
+  await seedDemoVendor();
   await seedReviews();
 }
 

@@ -72,6 +72,11 @@ function authHeaders(token: string): Record<string, string> {
 export const shiprocket: CarrierAdapter = {
   key: 'SHIPROCKET',
   displayName: 'Shiprocket',
+  category: 'AGGREGATOR',
+  supportedServices: [
+    { code: 'BEST',    name: 'Best Available',  serviceType: 'STANDARD', etaMinDays: 3, etaMaxDays: 7 },
+    { code: 'EXPRESS', name: 'Express Courier', serviceType: 'EXPRESS',  etaMinDays: 1, etaMaxDays: 3 },
+  ],
 
   credentialFields: [
     { key: 'email',          label: 'Shiprocket email',    type: 'text',   required: true },
