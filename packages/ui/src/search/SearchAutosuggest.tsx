@@ -36,13 +36,19 @@ function pushRecent(q: string) {
 
 interface Props {
   className?: string;
-  /** When set, restrict suggestions + results to this vendor and route into the storefront. */
+  /** When set, restrict suggestions + results to this vendor. */
   vendorId?: string;
   /** Override placeholder text. */
   placeholder?: string;
+  /**
+   * Override the base URL for the search-results page and product links.
+   * e.g. '/my-shop/products' for a vendor storefront at that path.
+   * Defaults to '/products' (no vendorId) or '/store/${vendorId}/products'.
+   */
+  searchBasePath?: string;
 }
 
-export function SearchAutosuggest({ className, vendorId, placeholder }: Props) {
+export function SearchAutosuggest({ className, vendorId, placeholder, searchBasePath }: Props) {
   const { code } = useCurrency();
   const router = useRouter();
   const enabled = !!APP_ID && !!SEARCH_KEY;
@@ -97,12 +103,13 @@ export function SearchAutosuggest({ className, vendorId, placeholder }: Props) {
     if (!value) return;
     pushRecent(value);
     setOpen(false);
-    const base = vendorId ? `/store/${vendorId}/products` : '/products';
-    router.push(`${base}?products%5Bquery%5D=${encodeURIComponent(value)}`);
+    const base = searchBasePath ?? (vendorId ? `/store/${vendorId}/products` : '/products');
+    router.push(`${base}?${INDEX}%5Bquery%5D=${encodeURIComponent(value)}`);
   }
 
   function hitHref(objectID: string) {
-    return vendorId ? `/store/${vendorId}/products/${objectID}` : `/products/${objectID}`;
+    const base = searchBasePath ?? (vendorId ? `/store/${vendorId}/products` : '/products');
+    return `${base}/${objectID}`;
   }
 
   return (

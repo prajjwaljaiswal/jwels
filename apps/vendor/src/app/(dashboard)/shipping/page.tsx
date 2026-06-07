@@ -17,10 +17,20 @@ interface CredentialField {
   isDefault?: boolean;
 }
 
+interface CarrierServiceDef {
+  code: string;
+  name: string;
+  serviceType: string;
+  etaMinDays: number;
+  etaMaxDays: number;
+}
+
 interface CarrierManifest {
   key: string;
   displayName: string;
   logoUrl?: string;
+  category: string;
+  supportedServices: CarrierServiceDef[];
   credentialFields: CredentialField[];
   supportsCreateShipment: boolean;
   supportsTracking: boolean;
@@ -224,30 +234,65 @@ function AccountsTab() {
 
   if (loading) return <Card className="p-6"><div className="text-sm text-ink-500">Loading…</div></Card>;
 
+  // Group carriers by category for display
+  const carriersByCategory = carriers.reduce<Record<string, CarrierManifest[]>>((acc, c) => {
+    const cat = c.category ?? 'Other';
+    (acc[cat] ??= []).push(c);
+    return acc;
+  }, {});
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    DOMESTIC: 'Domestic',
+    INTERNATIONAL: 'International',
+    AGGREGATOR: 'Aggregator',
+    HYPERLOCAL: 'Hyperlocal',
+  };
+
   return (
     <div className="space-y-6">
       <Card className="p-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold">Add a carrier</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {carriers.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setCreatingFor(c)}
-              className="border border-line rounded-md p-4 text-left hover:border-brand-500 hover:bg-brand-50 transition"
-            >
-              <div className="text-sm font-semibold text-ink-900">{c.displayName}</div>
-              <div className="text-xs text-ink-500 mt-0.5">{c.key}</div>
-            </button>
-          ))}
-        </div>
+        {Object.entries(carriersByCategory).map(([cat, list]) => (
+          <div key={cat} className="mb-4 last:mb-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">
+              {CATEGORY_LABELS[cat] ?? cat}
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {list.map((c) => (
+                <button
+                  key={c.key}
+                  onClick={() => setCreatingFor(c)}
+                  className="border border-line rounded-md p-4 text-left hover:border-brand-500 hover:bg-brand-50 transition"
+                >
+                  <div className="text-sm font-semibold text-ink-900">{c.displayName}</div>
+                  <div className="text-xs text-ink-500 mt-0.5">
+                    {c.supportsCreateShipment ? '✓ Label generation' : 'Rate quotes only'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </Card>
 
       <Card className="p-6">
         <h3 className="text-base font-semibold mb-3">Your carrier accounts</h3>
         {accounts.length === 0 ? (
-          <div className="text-sm text-ink-500">No carrier accounts yet.</div>
+          <div className="py-6 text-center">
+            <div className="text-sm text-ink-500 mb-2">No carrier accounts connected yet.</div>
+            <p className="text-xs text-ink-400 mb-4">
+              Connect a carrier to get live shipping rates at checkout and auto-generate waybills.
+            </p>
+            <button
+              onClick={() => setCreatingFor(carriers.find((c) => c.key === 'DELHIVERY') ?? null)}
+              className="inline-flex items-center gap-2 border-2 border-brand-400 bg-brand-50 rounded-md px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 transition"
+            >
+              + Connect Delhivery
+              <span className="text-xs font-normal text-brand-500">(recommended for India)</span>
+            </button>
+          </div>
         ) : (
           <div className="divide-y divide-line">
             {accounts.map((a) => (
@@ -307,7 +352,7 @@ function AccountModal({
   onSaved: () => Promise<void>;
 }) {
   const [label, setLabel] = useState(account?.accountLabel ?? '');
-  const [carrierMode, setCarrierMode] = useState<Mode>(account?.mode ?? 'TEST');
+  const [carrierMode, setCarrierMode] = useState<Mode>(account?.mode ?? 'LIVE');
   const [fields, setFields] = useState<Record<string, string>>(() => {
     // For edit: prefill non-secret defaults; secrets shown as masked, blank input means "keep prior"
     const init: Record<string, string> = {};
@@ -333,7 +378,7 @@ function AccountModal({
         if (v !== '') fieldsPayload[k] = v;
       }
       if (mode === 'create') {
-        await api('/api/shipping/vendor/accounts', {
+        const created = await api<CarrierAccount>('/api/shipping/vendor/accounts', {
           method: 'POST',
           body: JSON.stringify({
             carrier: carrier.key,
@@ -342,7 +387,18 @@ function AccountModal({
             fields: fieldsPayload,
           }),
         });
-        toast.success('Carrier account added');
+        toast.success('Account added — verifying…');
+        // Auto-verify immediately after creation
+        try {
+          const vr = await api<{ ok: boolean; message?: string; account: CarrierAccount }>(
+            `/api/shipping/vendor/accounts/${created.id}/verify`,
+            { method: 'POST' },
+          );
+          if (vr.ok) toast.success(vr.message || 'Credentials verified ✓');
+          else toast.error(`Verification failed: ${vr.message || 'Check your credentials'}`);
+        } catch {
+          toast('Could not auto-verify. Use the Verify button.', { icon: 'ℹ️' });
+        }
       } else if (account) {
         await api(`/api/shipping/vendor/accounts/${account.id}`, {
           method: 'PATCH',
@@ -383,6 +439,25 @@ function AccountModal({
           </Field>
 
           <div className="border-t border-line pt-4 space-y-4">
+            {carrier.key === 'DELHIVERY' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800 space-y-1.5">
+                <div className="font-semibold text-blue-900 mb-1">How to find your Delhivery credentials</div>
+                <div><span className="font-medium">Step 1:</span> Log in to the Delhivery seller dashboard → Settings → API → copy your API Token</div>
+                <div><span className="font-medium">Step 2:</span> Pickup Pincode = your warehouse dispatch pincode (e.g. 400001 for Mumbai)</div>
+                <div><span className="font-medium">Step 3 (optional):</span> Client Name = the pickup location name registered in your Delhivery account. Leave blank to use <code className="bg-blue-100 px-1 rounded">default</code></div>
+                <div className="pt-1 text-blue-700 font-medium">
+                  Live dashboard: app.delhivery.com · Sandbox: staging-express.delhivery.com
+                </div>
+              </div>
+            )}
+            {carrier.key === 'DTDC' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-800 space-y-1">
+                <div className="font-semibold text-amber-900 mb-1">DTDC API credentials</div>
+                <div><span className="font-medium">Client ID + Password:</span> From your DTDC business account API section</div>
+                <div><span className="font-medium">Customer Code:</span> Your DTDC account code (e.g. B12345) shown on your account page</div>
+                <div><span className="font-medium">Pickup Pincode:</span> Your warehouse pincode</div>
+              </div>
+            )}
             {carrier.credentialFields.map((f) => (
               <Field key={f.key} label={f.label} required={f.required && mode === 'create'}>
                 {f.type === 'select' ? (
@@ -464,17 +539,20 @@ function MethodsTab() {
   const currencySymbol = CURRENCIES[code].symbol;
   const [methods, setMethods] = useState<ShippingMethod[]>([]);
   const [accounts, setAccounts] = useState<CarrierAccount[]>([]);
+  const [carriers, setCarriers] = useState<CarrierManifest[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ShippingMethod | null>(null);
   const [creating, setCreating] = useState(false);
 
   async function reload() {
-    const [m, a] = await Promise.all([
+    const [m, a, cs] = await Promise.all([
       api<ShippingMethod[]>('/api/shipping/vendor/methods'),
       api<CarrierAccount[]>('/api/shipping/vendor/accounts'),
+      api<CarrierManifest[]>('/api/shipping/carriers', { auth: false }),
     ]);
     setMethods(m);
     setAccounts(a);
+    setCarriers(cs);
   }
 
   useEffect(() => { reload().finally(() => setLoading(false)); }, []);
@@ -541,6 +619,7 @@ function MethodsTab() {
         <MethodModal
           method={editing ?? null}
           accounts={accounts}
+          carriers={carriers}
           onClose={() => { setCreating(false); setEditing(null); }}
           onSaved={async () => { setCreating(false); setEditing(null); await reload(); }}
         />
@@ -550,10 +629,11 @@ function MethodsTab() {
 }
 
 function MethodModal({
-  method, accounts, onClose, onSaved,
+  method, accounts, carriers, onClose, onSaved,
 }: {
   method: ShippingMethod | null;
   accounts: CarrierAccount[];
+  carriers: CarrierManifest[];
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -564,6 +644,7 @@ function MethodModal({
     name: method?.name ?? '',
     carrier: method?.carrier ?? 'CUSTOM',
     serviceType: (method?.serviceType ?? 'STANDARD') as ServiceType,
+    serviceCode: '',
     rateMode: (method?.rateMode ?? 'FLAT') as RateMode,
     carrierAccountId: method?.carrierAccountId ?? '',
     baseRate: method ? Number(method.baseRate) : 0,
@@ -578,6 +659,10 @@ function MethodModal({
 
   // When LIVE: carrier follows the selected account's carrier.
   const verifiedAccounts = accounts.filter((a) => !!a.lastVerifiedAt);
+
+  // Carrier manifest for the currently selected account — used for service selector
+  const selectedCarrierKey = accounts.find((a) => a.id === form.carrierAccountId)?.carrier;
+  const selectedCarrierManifest = carriers.find((c) => c.key === selectedCarrierKey);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -606,6 +691,7 @@ function MethodModal({
         name: form.name,
         carrier,
         serviceType: form.serviceType,
+        serviceCode: form.serviceCode || undefined,
         rateMode: form.rateMode,
         carrierAccountId: form.rateMode === 'LIVE' ? (form.carrierAccountId || null) : null,
         baseRate: Number(form.baseRate) || 0,
@@ -661,20 +747,53 @@ function MethodModal({
           </Field>
 
           {form.rateMode === 'LIVE' ? (
-            <Field label="Carrier account" required>
-              {verifiedAccounts.length === 0 ? (
-                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                  No verified carrier accounts. Add one in the Carrier accounts tab and click Verify before using live rates.
-                </div>
-              ) : (
-                <select className="input" value={form.carrierAccountId} onChange={(e) => setForm({ ...form, carrierAccountId: e.target.value })} required>
-                  <option value="">— Select —</option>
-                  {verifiedAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>{a.carrier} · {a.accountLabel} ({a.mode})</option>
-                  ))}
-                </select>
+            <>
+              <Field label="Carrier account" required>
+                {verifiedAccounts.length === 0 ? (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                    No verified carrier accounts. Add one in the Carrier accounts tab and click Verify before using live rates.
+                  </div>
+                ) : (
+                  <select
+                    className="input"
+                    value={form.carrierAccountId}
+                    onChange={(e) => setForm({ ...form, carrierAccountId: e.target.value, serviceCode: '', serviceType: 'STANDARD' })}
+                    required
+                  >
+                    <option value="">— Select —</option>
+                    {verifiedAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.carrier} · {a.accountLabel} ({a.mode})</option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+              {form.carrierAccountId && (selectedCarrierManifest?.supportedServices?.length ?? 0) > 0 && (
+                <Field label="Service">
+                  <select
+                    className="input"
+                    value={form.serviceCode}
+                    onChange={(e) => {
+                      const svc = selectedCarrierManifest!.supportedServices.find((s) => s.code === e.target.value);
+                      setForm({
+                        ...form,
+                        serviceCode: e.target.value,
+                        serviceType: (svc?.serviceType ?? form.serviceType) as ServiceType,
+                        etaMinDays: svc?.etaMinDays ?? form.etaMinDays,
+                        etaMaxDays: svc?.etaMaxDays ?? form.etaMaxDays,
+                      });
+                    }}
+                  >
+                    <option value="">— Any (carrier decides) —</option>
+                    {selectedCarrierManifest!.supportedServices.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.name} · {s.etaMinDays}–{s.etaMaxDays} days
+                      </option>
+                    ))}
+                  </select>
+                  <div className="text-xs text-ink-500 mt-1">Selecting a service auto-fills ETA and service type.</div>
+                </Field>
               )}
-            </Field>
+            </>
           ) : (
             <>
               <Field label="Carrier">

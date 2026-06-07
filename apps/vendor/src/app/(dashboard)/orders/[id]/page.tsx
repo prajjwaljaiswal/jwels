@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { Card, StatusPill } from '@/components/dashboard/DashboardShell';
 import { useCurrency, formatPrice } from '@/lib/currency';
-import type { OrderItem } from '../page';
+import type { OrderItem, ShipmentInfo } from '../page';
 
 const COURIER_CHIPS = ['Delhivery', 'Bluedart', 'DTDC', 'FedEx', 'India Post'];
 
@@ -42,6 +42,7 @@ export default function VendorOrderDetailPage() {
   const itemId = params?.id;
 
   const [item, setItem]       = useState<OrderItem | null>(null);
+  const [genLabelLoading, setGenLabelLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -52,6 +53,10 @@ export default function VendorOrderDetailPage() {
   });
   const [waybillUploading, setWaybillUploading] = useState(false);
   const waybillInputRef = useRef<HTMLInputElement>(null);
+
+  const [awbForm, setAwbForm]       = useState({ carrierName: '', awb: '', trackingUrl: '' });
+  const [awbFormOpen, setAwbFormOpen] = useState(false);
+  const [awbSaving, setAwbSaving]   = useState(false);
 
   async function load() {
     try {
@@ -129,6 +134,59 @@ export default function VendorOrderDetailPage() {
       setUpdateErr(e.message);
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function generateLabel() {
+    setGenLabelLoading(true);
+    try {
+      const result = await api<ShipmentInfo>(`/api/fulfillment/orders/items/${itemId}/generate-label`, {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      if (result.awb) {
+        toast.success(`AWB generated: ${result.awb}`);
+      } else {
+        toast.success('Label created (no carrier AWB — print label manually)');
+      }
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to generate label', { duration: 8000 });
+    } finally {
+      setGenLabelLoading(false);
+    }
+  }
+
+  async function saveAwb() {
+    if (!item) return;
+    if (!awbForm.awb.trim())         { toast.error('AWB number is required'); return; }
+    if (!awbForm.carrierName.trim()) { toast.error('Select a carrier'); return; }
+    setAwbSaving(true);
+    try {
+      // If no shipment record exists yet, create a blank one (no carrier API called)
+      let shipmentId = item.shipment?.id;
+      if (!shipmentId) {
+        const created = await api<ShipmentInfo>(`/api/fulfillment/orders/items/${itemId}/manual-shipment`, {
+          method: 'POST',
+        });
+        shipmentId = created.id;
+      }
+      await api(`/api/fulfillment/shipments/${shipmentId}/awb`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          awb: awbForm.awb.trim(),
+          carrierName: awbForm.carrierName,
+          trackingUrl: awbForm.trackingUrl.trim() || null,
+        }),
+      });
+      toast.success(`AWB ${awbForm.awb.trim()} saved`);
+      setAwbFormOpen(false);
+      setAwbForm({ carrierName: '', awb: '', trackingUrl: '' });
+      await load();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save AWB');
+    } finally {
+      setAwbSaving(false);
     }
   }
 
@@ -450,6 +508,214 @@ export default function VendorOrderDetailPage() {
                 <p className="text-sm text-ink-500">No shipment created yet.</p>
               )}
             </div>
+          </Card>
+
+          {/* Fulfillment actions card */}
+          <Card className="p-6">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-500 mb-5">Fulfillment</h2>
+            {!item.shipment ? (
+              <div className="space-y-3">
+                {awbFormOpen ? (
+                  <div className="border border-line rounded-md p-4 space-y-3 bg-surface">
+                    <p className="text-xs font-semibold text-ink-700">Enter AWB Details</p>
+                    <div>
+                      <label className="text-xs text-ink-500 mb-1 block">Carrier / Service</label>
+                      <select
+                        value={awbForm.carrierName}
+                        onChange={(e) => setAwbForm((f) => ({ ...f, carrierName: e.target.value }))}
+                        className="input text-sm w-full"
+                      >
+                        <option value="">— Select carrier —</option>
+                        <option value="DELHIVERY">Delhivery</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="BLUEDART">Blue Dart</option>
+                        <option value="FEDEX">FedEx</option>
+                        <option value="SHIPROCKET">Shiprocket</option>
+                        <option value="INDIA_POST">India Post</option>
+                        <option value="ECOM_EXPRESS">Ecom Express</option>
+                        <option value="XPRESSBEES">XpressBees</option>
+                        <option value="SHADOWFAX">Shadowfax</option>
+                        <option value="USPS">USPS</option>
+                        <option value="CUSTOM">Other / Custom</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-500 mb-1 block">AWB / Tracking Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 1234567890"
+                        value={awbForm.awb}
+                        onChange={(e) => setAwbForm((f) => ({ ...f, awb: e.target.value }))}
+                        className="input text-sm w-full font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-500 mb-1 block">Tracking URL <span className="text-ink-400">(optional)</span></label>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={awbForm.trackingUrl}
+                        onChange={(e) => setAwbForm((f) => ({ ...f, trackingUrl: e.target.value }))}
+                        className="input text-sm w-full"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={saveAwb} disabled={awbSaving} className="btn-primary text-sm !py-1.5 !px-4">
+                        {awbSaving ? 'Saving…' : 'Save AWB'}
+                      </button>
+                      <button onClick={() => { setAwbFormOpen(false); setAwbForm({ carrierName: '', awb: '', trackingUrl: '' }); }} className="btn-secondary text-sm !py-1.5 !px-3">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-ink-700">No label generated yet.</p>
+                    <button
+                      onClick={generateLabel}
+                      disabled={genLabelLoading || item.status === 'CANCELLED'}
+                      className="btn-primary w-full !py-2.5 text-sm"
+                    >
+                      {genLabelLoading ? 'Generating…' : 'Generate Label via Carrier'}
+                    </button>
+                    <p className="text-xs text-center text-ink-400">or</p>
+                    <button
+                      onClick={() => setAwbFormOpen(true)}
+                      disabled={item.status === 'CANCELLED'}
+                      className="btn-secondary w-full !py-2.5 text-sm"
+                    >
+                      Enter AWB Manually
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-500">Status</span>
+                  <span className="text-sm font-medium text-ink-900">{item.shipment.status.replace(/_/g, ' ')}</span>
+                </div>
+
+                {/* AWB display or entry */}
+                {item.shipment.awb ? (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-md px-4 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-emerald-600 font-semibold mb-0.5">
+                        {item.shipment.carrierName ?? 'Carrier'} · AWB
+                      </p>
+                      <p className="font-mono font-bold text-emerald-900 text-base tracking-wide">{item.shipment.awb}</p>
+                    </div>
+                    <button
+                      onClick={() => { setAwbForm({ carrierName: item.shipment!.carrierName ?? '', awb: item.shipment!.awb!, trackingUrl: '' }); setAwbFormOpen(true); }}
+                      className="text-xs text-emerald-700 hover:text-emerald-900 underline shrink-0"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-md px-4 py-3">
+                    <p className="text-sm text-amber-800 font-medium mb-2">No AWB assigned yet</p>
+                    {!awbFormOpen && (
+                      <button onClick={() => setAwbFormOpen(true)} className="btn-secondary text-xs !py-1.5 !px-3">
+                        + Enter AWB manually
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Manual AWB form */}
+                {awbFormOpen && (
+                  <div className="border border-line rounded-md p-4 space-y-3 bg-surface">
+                    <p className="text-xs font-semibold text-ink-700">Enter AWB Details</p>
+                    <div>
+                      <label className="text-xs text-ink-500 mb-1 block">Carrier / Service</label>
+                      <select
+                        value={awbForm.carrierName}
+                        onChange={(e) => setAwbForm((f) => ({ ...f, carrierName: e.target.value }))}
+                        className="input text-sm w-full"
+                      >
+                        <option value="">— Select carrier —</option>
+                        <option value="DELHIVERY">Delhivery</option>
+                        <option value="DTDC">DTDC</option>
+                        <option value="BLUEDART">Blue Dart</option>
+                        <option value="FEDEX">FedEx</option>
+                        <option value="SHIPROCKET">Shiprocket</option>
+                        <option value="INDIA_POST">India Post</option>
+                        <option value="ECOM_EXPRESS">Ecom Express</option>
+                        <option value="XPRESSBEES">XpressBees</option>
+                        <option value="SHADOWFAX">Shadowfax</option>
+                        <option value="USPS">USPS</option>
+                        <option value="CUSTOM">Other / Custom</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-500 mb-1 block">AWB / Tracking Number</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 1234567890"
+                        value={awbForm.awb}
+                        onChange={(e) => setAwbForm((f) => ({ ...f, awb: e.target.value }))}
+                        className="input text-sm w-full font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-ink-500 mb-1 block">Tracking URL <span className="text-ink-400">(optional)</span></label>
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={awbForm.trackingUrl}
+                        onChange={(e) => setAwbForm((f) => ({ ...f, trackingUrl: e.target.value }))}
+                        className="input text-sm w-full"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={saveAwb} disabled={awbSaving} className="btn-primary text-sm !py-1.5 !px-4">
+                        {awbSaving ? 'Saving…' : 'Save AWB'}
+                      </button>
+                      <button onClick={() => { setAwbFormOpen(false); setAwbForm({ carrierName: '', awb: '', trackingUrl: '' }); }} className="btn-secondary text-sm !py-1.5 !px-3">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Label download */}
+                {item.shipment.labelUrl ? (
+                  <a href={item.shipment.labelUrl} target="_blank" rel="noreferrer"
+                    className="flex items-center justify-center gap-2 w-full btn-primary !py-2.5 text-sm">
+                    ↓ Download Label PDF
+                  </a>
+                ) : (
+                  <Link href={`/orders/${item.id}/label`} target="_blank"
+                    className="flex items-center justify-center gap-2 w-full btn-secondary !py-2.5 text-sm">
+                    🖨 Print Shipping Label
+                  </Link>
+                )}
+
+                <div className="pt-3 border-t border-line flex flex-wrap gap-2">
+                  {item.shipment.status === 'LABEL_GENERATED' && (
+                    <>
+                      <Link href={`/manifest?select=${item.shipment.id}`} className="btn-secondary text-sm !py-1.5 !px-3">
+                        Add to manifest
+                      </Link>
+                      <Link href="/dispatch" className="btn-secondary text-sm !py-1.5 !px-3">
+                        Go to dispatch
+                      </Link>
+                    </>
+                  )}
+                  {['MANIFEST_GENERATED', 'PICKUP_SCHEDULED', 'PICKED_UP'].includes(item.shipment.status) && (
+                    <Link href="/manifest" className="btn-secondary text-sm !py-1.5 !px-3">
+                      View manifest
+                    </Link>
+                  )}
+                  {item.shipment.awb && (
+                    <Link href={`/tracking?awb=${item.shipment.awb}`} className="btn-secondary text-sm !py-1.5 !px-3">
+                      Track shipment
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
         </div>
 

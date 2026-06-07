@@ -169,9 +169,10 @@ function Header() {
 
         {ALGOLIA_READY ? (
           <SearchAutosuggest
-            vendorId={storeKey}
+            vendorId={vendor.id}
+            searchBasePath={`/${storeKey}/products`}
             placeholder={`Search ${vendor.shopName}…`}
-            className="hidden md:block flex-1 max-w-xl mx-2"
+            className="flex-1 max-w-xl mx-2"
           />
         ) : (
           <div className="flex-1" />

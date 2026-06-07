@@ -375,3 +375,12 @@ html { scroll-behavior: smooth; }
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
 }
+
+/* ── Print utilities for manifest & label printing ── */
+@media print {
+  body.printing-manifest > *:not(#manifest-print) { display: none !important; }
+  body.printing-manifest #manifest-print { display: block !important; }
+  body.printing-label > *:not(#label-print) { display: none !important; }
+  body.printing-label #label-print { display: block !important; }
+  .no-print { display: none !important; }
+}

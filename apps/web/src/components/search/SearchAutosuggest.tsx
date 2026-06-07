@@ -98,7 +98,7 @@ export function SearchAutosuggest({ className, vendorId, placeholder }: Props) {
     pushRecent(value);
     setOpen(false);
     const base = vendorId ? `/store/${vendorId}/products` : '/products';
-    router.push(`${base}?products%5Bquery%5D=${encodeURIComponent(value)}`);
+    router.push(`${base}?${INDEX}%5Bquery%5D=${encodeURIComponent(value)}`);
   }
 
   function hitHref(objectID: string) {

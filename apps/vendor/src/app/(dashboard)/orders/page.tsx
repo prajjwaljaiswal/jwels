@@ -5,6 +5,14 @@ import { api } from '@/lib/api';
 import { PageHeader, Card, StatusPill } from '@/components/dashboard/DashboardShell';
 import { useCurrency, formatPrice } from '@/lib/currency';
 
+export interface ShipmentInfo {
+  id: string;
+  status: string;
+  awb: string | null;
+  labelUrl: string | null;
+  carrierName?: string | null;
+}
+
 export interface OrderItem {
   id: string;
   quantity: number;
@@ -20,6 +28,7 @@ export interface OrderItem {
   waybillUrl: string | null;
   dispatchedAt: string | null;
   deliveredAt: string | null;
+  shipment: ShipmentInfo | null;
   product: { name: string; images: string[] };
   order: {
     id: string;
@@ -31,27 +40,50 @@ export interface OrderItem {
 }
 
 const TABS = [
-  { id: 'TO_SHIP',   label: 'To ship' },
-  { id: 'SHIPPED',   label: 'Shipped' },
-  { id: 'DELIVERED', label: 'Delivered' },
-  { id: 'CANCELLED', label: 'Cancelled' },
+  { id: 'NEW',        label: 'New' },
+  { id: 'PROCESSING', label: 'Processing' },
+  { id: 'DISPATCHED', label: 'Dispatched' },
+  { id: 'IN_TRANSIT', label: 'In Transit' },
+  { id: 'DELIVERED',  label: 'Delivered' },
+  { id: 'RTO',        label: 'RTO' },
+  { id: 'CANCELLED',  label: 'Cancelled' },
 ] as const;
 
-function statusTone(s: string): 'success' | 'info' | 'danger' | 'warn' {
-  if (s === 'DELIVERED') return 'success';
-  if (s === 'SHIPPED')   return 'info';
-  if (s === 'CANCELLED') return 'danger';
+type TabId = typeof TABS[number]['id'];
+
+function tabFor(item: OrderItem): TabId {
+  if (item.status === 'CANCELLED') return 'CANCELLED';
+  const ss = item.shipment?.status;
+  if (!ss) return 'NEW';
+  if (ss === 'LABEL_GENERATED') return 'PROCESSING';
+  if (['MANIFEST_GENERATED', 'PICKUP_SCHEDULED', 'PICKED_UP'].includes(ss)) return 'DISPATCHED';
+  if (['IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(ss)) return 'IN_TRANSIT';
+  if (['DELIVERED', 'COMPLETED'].includes(ss)) return 'DELIVERED';
+  if (['RTO_INITIATED', 'RTO_DELIVERED'].includes(ss)) return 'RTO';
+  return 'NEW';
+}
+
+function statusTone(item: OrderItem): 'success' | 'info' | 'danger' | 'warn' | 'neutral' {
+  const ss = item.shipment?.status;
+  if (item.status === 'CANCELLED') return 'danger';
+  if (!ss) return 'warn';
+  if (['DELIVERED', 'COMPLETED'].includes(ss)) return 'success';
+  if (['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'].includes(ss)) return 'info';
+  if (['RTO_INITIATED', 'RTO_DELIVERED'].includes(ss)) return 'danger';
   return 'warn';
 }
 
-function statusLabel(s: string) {
-  return s === 'PENDING' ? 'COD PENDING' : s;
+function displayStatus(item: OrderItem) {
+  const ss = item.shipment?.status;
+  if (item.status === 'CANCELLED') return 'CANCELLED';
+  if (!ss) return item.status === 'PAID' ? 'NEW ORDER' : item.status;
+  return ss.replace(/_/g, ' ');
 }
 
 export default function VendorOrdersPage() {
   const { code } = useCurrency();
   const [items, setItems]     = useState<OrderItem[]>([]);
-  const [tab, setTab]         = useState<typeof TABS[number]['id']>('TO_SHIP');
+  const [tab, setTab]         = useState<TabId>('NEW');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,17 +93,12 @@ export default function VendorOrdersPage() {
   }, []);
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { TO_SHIP: 0, SHIPPED: 0, DELIVERED: 0, CANCELLED: 0 };
-    items.forEach((i) => {
-      if (i.status === 'PAID' || i.status === 'PENDING') c.TO_SHIP += 1;
-      else if (c[i.status] !== undefined) c[i.status] += 1;
-    });
+    const c: Record<TabId, number> = { NEW: 0, PROCESSING: 0, DISPATCHED: 0, IN_TRANSIT: 0, DELIVERED: 0, RTO: 0, CANCELLED: 0 };
+    items.forEach((i) => { c[tabFor(i)] += 1; });
     return c;
   }, [items]);
 
-  const visible = tab === 'TO_SHIP'
-    ? items.filter((i) => i.status === 'PAID' || i.status === 'PENDING')
-    : items.filter((i) => i.status === tab);
+  const visible = items.filter((i) => tabFor(i) === tab);
 
   return (
     <div>
@@ -92,11 +119,13 @@ export default function VendorOrdersPage() {
                 ].join(' ')}
               >
                 <span>{t.label}</span>
-                <span className={`ml-2 text-[11px] px-1.5 py-0.5 rounded-pill ${active ? 'bg-brand-50 text-brand-700' : 'bg-canvas text-ink-700'}`}>
-                  {counts[t.id] || 0}
-                </span>
+                {counts[t.id] > 0 && (
+                  <span className={`ml-2 text-[11px] px-1.5 py-0.5 rounded-full ${active ? 'bg-brand-50 text-brand-700' : 'bg-canvas text-ink-700'}`}>
+                    {counts[t.id]}
+                  </span>
+                )}
                 {active && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-brand-600 rounded-full" />}
-                <span className="mx-3" />
+                <span className="mx-2" />
               </button>
             );
           })}
@@ -118,8 +147,9 @@ export default function VendorOrdersPage() {
         <div className="space-y-3">
           {visible.map((it) => {
             const addr = it.order.shippingAddress;
+            const labelUrl = it.shipment?.labelUrl ?? it.labelUrl;
             return (
-              <Link key={it.id} href={`/orders/${it.id}`}>
+              <Link key={it.id} href={`/orders/${it.id}`} className="block">
                 <Card className="p-4 flex gap-4 items-center hover:border-brand-300 transition-colors cursor-pointer">
                   <div className="h-20 w-20 rounded-md bg-canvas overflow-hidden shrink-0">
                     {it.product.images[0] && (
@@ -140,10 +170,35 @@ export default function VendorOrdersPage() {
                     {addr && (
                       <p className="text-xs text-ink-500 truncate">{addr.line1}, {addr.city} – {addr.pincode}</p>
                     )}
+                    {it.shipment?.awb && (
+                      <p className="text-xs text-ink-500 font-mono mt-0.5">AWB: {it.shipment.awb}</p>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
-                    <StatusPill tone={statusTone(it.status)}>{statusLabel(it.status)}</StatusPill>
-                    <span className="text-xs text-brand-700">View details →</span>
+                    <StatusPill tone={statusTone(it)}>{displayStatus(it)}</StatusPill>
+                    {labelUrl ? (
+                      <a
+                        href={labelUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-900 hover:underline"
+                      >
+                        ↓ Download label
+                      </a>
+                    ) : it.shipment ? (
+                      <a
+                        href={`/orders/${it.id}/label`}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs font-medium text-brand-700 hover:text-brand-900 hover:underline"
+                      >
+                        🖨 Print label
+                      </a>
+                    ) : (
+                      <span className="text-xs text-brand-700">View details →</span>
+                    )}
                   </div>
                 </Card>
               </Link>
