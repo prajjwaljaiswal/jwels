@@ -12,6 +12,15 @@ interface Me {
   role: 'CUSTOMER' | 'VENDOR' | 'ADMIN';
 }
 
+function PersonIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </svg>
+  );
+}
+
 export function AccountMenu({ storeKey: forcedKey }: { storeKey?: string } = {}) {
   const isStorefront = !!forcedKey;
   const router = useRouter();
@@ -64,11 +73,23 @@ export function AccountMenu({ storeKey: forcedKey }: { storeKey?: string } = {})
 
   if (!me) {
     return (
-      <div className="flex items-center gap-3">
-        <Link href={loginHref} className="hover:text-brand-700">Sign in</Link>
-        <span className="text-ink-300">·</span>
-        <Link href={registerHref} className="hover:text-brand-700">Register</Link>
-      </div>
+      <>
+        {/* Mobile — icon only to avoid crowding the header */}
+        <Link
+          href={loginHref}
+          aria-label="Sign in"
+          className="sm:hidden h-10 w-10 rounded-full flex items-center justify-center border hover:opacity-80 transition-opacity shrink-0"
+          style={{ borderColor: 'rgba(0,0,0,0.15)' }}
+        >
+          <PersonIcon />
+        </Link>
+        {/* sm+ — text links */}
+        <div className="hidden sm:flex items-center gap-3">
+          <Link href={loginHref} className="hover:text-brand-700">Sign in</Link>
+          <span className="text-ink-300">·</span>
+          <Link href={registerHref} className="hover:text-brand-700">Register</Link>
+        </div>
+      </>
     );
   }
 

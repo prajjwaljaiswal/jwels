@@ -152,11 +152,11 @@ function Header() {
       <div className="max-w-6xl mx-auto px-5 h-16 flex items-center gap-4">
         <Link href={`/${storeKey}`} className="flex items-center gap-3 min-w-0">
           {vendor.shopLogoUrl
-            ? <img src={vendor.shopLogoUrl} alt={vendor.shopName} className="h-10 w-10 rounded-full object-cover border border-line shrink-0" />
+            ? <img src={vendor.shopLogoUrl} alt={vendor.shopName} className="h-14 w-auto max-w-[160px] object-contain shrink-0" />
             : <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg shrink-0" style={{ background: theme }}>
                 {vendor.shopName[0].toUpperCase()}
               </div>}
-          <div className="min-w-0">
+          <div className="min-w-0 hidden sm:block">
             <p
               className="text-lg leading-tight font-bold truncate"
               style={{ color: theme, fontFamily: FONT_STACKS[t.typography.headingFont] }}
@@ -172,7 +172,7 @@ function Header() {
             vendorId={vendor.id}
             searchBasePath={`/${storeKey}/products`}
             placeholder={`Search ${vendor.shopName}…`}
-            className="flex-1 max-w-xl mx-2"
+            className="flex-1 max-w-xl ml-3 sm:mx-2"
           />
         ) : (
           <div className="flex-1" />
@@ -186,7 +186,7 @@ function Header() {
           </nav>
         )}
 
-        <div className="hidden sm:flex items-center text-sm shrink-0" style={{ color: t.colors.headerText }}>
+        <div className="flex items-center text-sm shrink-0" style={{ color: t.colors.headerText }}>
           <AccountMenu storeKey={storeKey} />
         </div>
 
@@ -324,7 +324,7 @@ function Footer() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               {vendor.shopLogoUrl
-                ? <img src={vendor.shopLogoUrl} alt="" className="h-8 w-8 rounded-full object-cover" />
+                ? <img src={vendor.shopLogoUrl} alt="" className="h-12 w-auto max-w-[140px] object-contain" />
                 : <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: theme }}>{vendor.shopName[0]}</div>}
               <span className="font-semibold" style={{ color: theme, fontFamily: FONT_STACKS[t.typography.headingFont] }}>{vendor.shopName}</span>
             </div>
