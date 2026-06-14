@@ -36,9 +36,12 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   const hasVariationRange = comboPrices.length > 0 && minPrice !== maxPrice;
   const displayPrice = hasVariationRange ? minPrice : Number(product.price);
 
-  const storefrontBase = process.env.NEXT_PUBLIC_STOREFRONT_URL || '';
+  // Relative path only — the storefront serves one vendor per domain and the
+  // middleware rewrites paths transparently, so we must NOT prepend an absolute
+  // base URL (doing so navigated production users off their custom domain onto
+  // NEXT_PUBLIC_STOREFRONT_URL).
   const productHref = product.vendor.slug && product.slug
-    ? `${storefrontBase}/${product.vendor.slug}/${product.slug}`
+    ? `/${product.vendor.slug}/${product.slug}`
     : `/products/${product.id}`;
 
   const img0 = product.images[0];
