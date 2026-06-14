@@ -6,6 +6,7 @@ import { useCart } from '@/lib/cart';
 import { AccountMenu } from './AccountMenu';
 import { SearchAutosuggest } from '@/components/search/SearchAutosuggest';
 import { MegaMenu } from './MegaMenu';
+import { Logo } from '@/components/brand/Logo';
 
 const ALGOLIA_READY =
   !!process.env.NEXT_PUBLIC_ALGOLIA_APP_ID && !!process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
@@ -31,7 +32,7 @@ export function Header() {
       {/* Row 1 */}
       <div className="max-w-container mx-auto px-6 h-16 flex items-center gap-6">
         <Link href="/" className="flex items-center gap-1 shrink-0">
-          <span className="font-display text-3xl text-brand-600 leading-none">Vrindaonline</span>
+          <Logo />
         </Link>
 
         {ALGOLIA_READY ? (

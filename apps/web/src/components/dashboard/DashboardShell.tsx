@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
+import { Logo } from '@/components/brand/Logo';
 
 export interface NavItem {
   label: string;
@@ -44,7 +45,7 @@ export function DashboardShell({ brand, nav, topRight, children }: ShellProps) {
                 {brand.eyebrow}
               </span>
             )}
-            <span className="font-display text-2xl text-brand-600 leading-none">Vrindaonline</span>
+            <Logo markClassName="h-7 w-7" textClassName="font-display text-2xl text-brand-600 leading-none" />
             <span className="hidden md:inline text-sm text-ink-700 border-l border-line pl-2 ml-1">
               {brand.title}
             </span>

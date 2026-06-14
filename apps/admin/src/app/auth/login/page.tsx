@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api, setToken } from '@/lib/api';
+import { Logo } from '@/components/brand/Logo';
 
 export default function AdminLoginPage() {
   return (
@@ -55,7 +56,7 @@ function LoginInner() {
       <div className="w-full max-w-sm">
         {/* Logo / brand */}
         <div className="text-center mb-8">
-          <span className="font-display text-3xl text-ink-900">Vrindaonline</span>
+          <Logo className="justify-center" textClassName="font-display text-3xl text-ink-900" />
           <p className="text-sm text-ink-500 mt-1">Operations console</p>
         </div>
 

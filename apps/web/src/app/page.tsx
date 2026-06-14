@@ -10,6 +10,7 @@ import { SparkleCanvas } from '@/components/landing/SparkleCanvas';
 import { Parallax } from '@/components/landing/Parallax';
 import { CursorSpotlight } from '@/components/landing/CursorSpotlight';
 import { ScrollProgress } from '@/components/landing/ScrollProgress';
+import { Logo } from '@/components/brand/Logo';
 import { StickyCta } from '@/components/landing/StickyCta';
 import { TiltCard } from '@/components/landing/TiltCard';
 import { FAQAccordion } from '@/components/landing/FAQAccordion';
@@ -157,9 +158,7 @@ export default function HomePage() {
 
           <div className="absolute top-6 left-0 right-0 z-20">
             <div className="max-w-container mx-auto px-6 flex items-center justify-between">
-              <span className="font-display text-3xl text-brand-600 leading-none drop-shadow-sm">
-                Vrindaonline
-              </span>
+              <Logo textClassName="font-display text-3xl text-brand-600 leading-none drop-shadow-sm" />
               <div className="hidden md:flex items-center gap-3">
                 <Link
                   href="/login"
@@ -758,7 +757,7 @@ export default function HomePage() {
       <footer className="border-t border-line bg-canvas">
         <div className="max-w-container mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <span className="font-display text-2xl text-brand-600">Vrindaonline</span>
+            <Logo markClassName="h-7 w-7" textClassName="font-display text-2xl text-brand-600" />
             <span className="text-xs text-ink-500">Handcrafted marketplace · India · Est. 2026</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-ink-700">

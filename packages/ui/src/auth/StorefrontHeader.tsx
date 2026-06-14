@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useCart } from '@/lib/cart';
 import { FONT_STACKS, type VendorBrand, type VendorTheme } from '@/lib/vendor-context';
+import { Logo } from '@/components/brand/Logo';
 
 interface Props {
   vendor: VendorBrand | null;
@@ -57,7 +58,7 @@ export function StorefrontHeader({ vendor, themeConfig: t, vendorKey }: Props) {
             </div>
           </Link>
         ) : (
-          <span className="font-bold text-xl" style={{ color: primary }}>Vrindaonline</span>
+          <Logo monochrome markClassName="h-6 w-6" textClassName="font-bold text-xl" style={{ color: primary }} />
         )}
 
         <div className="flex-1" />
