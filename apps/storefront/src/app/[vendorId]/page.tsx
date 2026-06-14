@@ -53,7 +53,7 @@ export async function generateMetadata({
 
   const title = home?.seoTitle || `${vendor.shopName}${vendor.tagline ? ` — ${vendor.tagline}` : ''}`;
   const description =
-    home?.seoDescription || vendor.tagline || vendor.description || `Shop ${vendor.shopName} on Jewel Marketplace.`;
+    home?.seoDescription || vendor.tagline || vendor.description || `Shop ${vendor.shopName} on Vrindaonline Marketplace.`;
   const imageUrl = home?.seoImageUrl || vendor.bannerUrls?.[0] || vendor.shopLogoUrl || undefined;
   const images = imageUrl ? [{ url: imageUrl }] : undefined;
 

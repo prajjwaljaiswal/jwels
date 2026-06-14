@@ -44,7 +44,7 @@ export function DashboardShell({ brand, nav, topRight, children }: ShellProps) {
                 {brand.eyebrow}
               </span>
             )}
-            <span className="font-display text-2xl text-brand-600 leading-none">Jewel</span>
+            <span className="font-display text-2xl text-brand-600 leading-none">Vrindaonline</span>
             <span className="hidden md:inline text-sm text-ink-700 border-l border-line pl-2 ml-1">
               {brand.title}
             </span>

@@ -10,7 +10,7 @@ const transporter = nodemailer.createTransport({
 
 export async function sendPasswordResetEmail(to: string, resetLink: string) {
   await transporter.sendMail({
-    from: `"Jewel Marketplace" <${process.env.GMAIL_USER}>`,
+    from: `"Vrindaonline Marketplace" <${process.env.GMAIL_USER}>`,
     to,
     subject: 'Reset your password',
     html: `

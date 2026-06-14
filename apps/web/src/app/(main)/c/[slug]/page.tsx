@@ -72,8 +72,8 @@ function describeFilters(f: Filters): string {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const cat = await fetchCategory(params.slug);
   if (!cat) return { title: 'Category not found' };
-  const title = cat.metaTitle || `${cat.name} — Jewel`;
-  const description = cat.metaDescription || cat.description || `Shop ${cat.name} at Jewel.`;
+  const title = cat.metaTitle || `${cat.name} — Vrindaonline`;
+  const description = cat.metaDescription || cat.description || `Shop ${cat.name} at Vrindaonline.`;
   const image = cat.metaImageUrl || cat.imageUrl || undefined;
   return {
     title,

@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     // ─── API (Express) ───────────────────────────────────────────────
     {
-      name: 'jewel-api',
+      name: 'vrindaonline-api',
       cwd: './apps/api',
       script: 'node',
       args: 'dist/index.js',
@@ -18,7 +18,7 @@ module.exports = {
 
     // ─── Customer Storefront (Next.js, port 3000) ─────────────────────
     {
-      name: 'jewel-web',
+      name: 'vrindaonline-web',
       cwd: './apps/web',
       script: 'node_modules/.bin/next',
       args: 'start',
@@ -34,7 +34,7 @@ module.exports = {
 
     // ─── Vendor Dashboard (Next.js, port 3001) ────────────────────────
     {
-      name: 'jewel-vendor',
+      name: 'vrindaonline-vendor',
       cwd: './apps/vendor',
       script: 'node_modules/.bin/next',
       args: 'start -p 3001',
@@ -50,7 +50,7 @@ module.exports = {
 
     // ─── Admin Console (Next.js, port 3002) ───────────────────────────
     {
-      name: 'jewel-admin',
+      name: 'vrindaonline-admin',
       cwd: './apps/admin',
       script: 'node_modules/.bin/next',
       args: 'start -p 3002',
@@ -66,7 +66,7 @@ module.exports = {
 
     // ─── Storefront (Next.js, port 3003) ─────────────────────────────
     {
-      name: 'jewel-storefront',
+      name: 'vrindaonline-storefront',
       cwd: './apps/storefront',
       script: 'node_modules/.bin/next',
       args: 'start -p 3003',

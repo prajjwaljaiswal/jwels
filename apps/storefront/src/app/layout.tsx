@@ -4,8 +4,8 @@ import { Toaster } from 'react-hot-toast';
 import { CartHydrator } from '@/components/CartHydrator';
 
 export const metadata: Metadata = {
-  title: 'Jewel Storefront',
-  description: 'Vendor storefronts powered by Jewel Marketplace.',
+  title: 'Vrindaonline Storefront',
+  description: 'Vendor storefronts powered by Vrindaonline Marketplace.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

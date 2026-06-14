@@ -242,7 +242,7 @@ function RegisterInner() {
 
             <p className="text-[11px] text-center mt-5"
               style={{ color: `color-mix(in srgb, ${t.colors.text} 45%, transparent)` }}>
-              By continuing, you agree to Jewel's Terms and Privacy Policy.
+              By continuing, you agree to Vrindaonline's Terms and Privacy Policy.
             </p>
           </div>
 

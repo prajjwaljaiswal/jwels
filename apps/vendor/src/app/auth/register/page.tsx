@@ -182,7 +182,7 @@ function RegisterInner() {
           </form>
 
           <p className="text-[11px] text-ink-500 text-center mt-5">
-            By creating an account, you agree to Jewel's Terms and Privacy Policy.
+            By creating an account, you agree to Vrindaonline's Terms and Privacy Policy.
           </p>
         </div>
       </div>

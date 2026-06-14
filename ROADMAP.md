@@ -1,4 +1,4 @@
-# jewel-marketplace — Feature Roadmap
+# vrindaonline-marketplace — Feature Roadmap
 
 A B2C multi-vendor jewellery marketplace (Flipkart/Amazon model). Tasks are grouped by quarter and ordered by ROI. Implement top-to-bottom; each task is scoped to be a 1–5 day chunk.
 

@@ -6,7 +6,7 @@ import { encryptJson } from '../src/lib/crypto';
 const prisma = new PrismaClient();
 
 async function seedAdmin() {
-  const adminEmail = 'admin@jewel.local';
+  const adminEmail = 'admin@vrindaonline.local';
   const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
   if (existing) {
     console.log('Admin already exists, skipping.');
@@ -321,7 +321,7 @@ async function findOrCreateShippingMethod(data: Parameters<typeof prisma.shippin
 }
 
 async function seedDemoVendor() {
-  const vendorEmail = 'vendor@jewel.local';
+  const vendorEmail = 'vendor@vrindaonline.local';
   const passwordHash = await bcrypt.hash('vendor123', 10);
 
   // 1. Upsert vendor user
@@ -338,8 +338,8 @@ async function seedDemoVendor() {
     update: {},
     create: {
       userId: user.id,
-      shopName: 'Jewel Demo Store',
-      slug: 'jewel-demo-store',
+      shopName: 'Vrindaonline Demo Store',
+      slug: 'vrindaonline-demo-store',
       status: VendorStatus.APPROVED,
       address: 'Mumbai, Maharashtra',
       description: 'Demo vendor store for testing Delhivery shipping integration.',

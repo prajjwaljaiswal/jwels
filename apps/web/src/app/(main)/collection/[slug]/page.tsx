@@ -29,8 +29,8 @@ async function fetchCollection(slug: string): Promise<Collection | null> {
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
   const col = await fetchCollection(params.slug);
   if (!col) return { title: 'Collection not found' };
-  const title = col.metaTitle || `${col.name} — Jewel`;
-  const description = col.metaDescription || col.description || `Shop our ${col.name} collection at Jewel.`;
+  const title = col.metaTitle || `${col.name} — Vrindaonline`;
+  const description = col.metaDescription || col.description || `Shop our ${col.name} collection at Vrindaonline.`;
   const image = col.metaImageUrl || col.bannerUrl || col.imageUrl || undefined;
   return {
     title,

@@ -67,10 +67,10 @@ export function Footer() {
 
         <div className="mt-12 pt-6 border-t border-line flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-display text-2xl text-brand-600">Jewel</span>
+            <span className="font-display text-2xl text-brand-600">Vrindaonline</span>
             <span className="text-xs text-ink-500">Handcrafted marketplace · India</span>
           </div>
-          <div className="text-xs text-ink-500">© {new Date().getFullYear()} Jewel Marketplace. All rights reserved.</div>
+          <div className="text-xs text-ink-500">© {new Date().getFullYear()} Vrindaonline Marketplace. All rights reserved.</div>
         </div>
       </div>
     </footer>

@@ -31,7 +31,7 @@ export function Header() {
       {/* Row 1 */}
       <div className="max-w-container mx-auto px-6 h-16 flex items-center gap-6">
         <Link href="/" className="flex items-center gap-1 shrink-0">
-          <span className="font-display text-3xl text-brand-600 leading-none">Jewel</span>
+          <span className="font-display text-3xl text-brand-600 leading-none">Vrindaonline</span>
         </Link>
 
         {ALGOLIA_READY ? (

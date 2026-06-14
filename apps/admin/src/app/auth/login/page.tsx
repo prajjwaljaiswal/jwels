@@ -55,14 +55,14 @@ function LoginInner() {
       <div className="w-full max-w-sm">
         {/* Logo / brand */}
         <div className="text-center mb-8">
-          <span className="font-display text-3xl text-ink-900">Jewel</span>
+          <span className="font-display text-3xl text-ink-900">Vrindaonline</span>
           <p className="text-sm text-ink-500 mt-1">Operations console</p>
         </div>
 
         <div className="bg-surface border border-line rounded-md shadow-card p-7">
           <h1 className="font-display text-2xl text-ink-900 mb-1">Admin sign in</h1>
           <p className="text-sm text-ink-500 mb-6">
-            Restricted to authorised Jewel staff only.
+            Restricted to authorised Vrindaonline staff only.
           </p>
 
           <form onSubmit={onSubmit} className="space-y-4">
@@ -72,7 +72,7 @@ function LoginInner() {
                 className="input-field"
                 type="email"
                 autoComplete="email"
-                placeholder="admin@jewel.local"
+                placeholder="admin@vrindaonline.local"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -111,12 +111,12 @@ function LoginInner() {
           </form>
 
           <p className="text-[11px] text-ink-500 text-center mt-5">
-            By continuing, you agree to Jewel's Terms and Privacy Policy.
+            By continuing, you agree to Vrindaonline's Terms and Privacy Policy.
           </p>
         </div>
 
         <p className="text-center text-xs text-ink-500 mt-6">
-          Default seed account: <span className="font-mono text-ink-700">admin@jewel.local / admin123</span>
+          Default seed account: <span className="font-mono text-ink-700">admin@vrindaonline.local / admin123</span>
         </p>
       </div>
     </div>

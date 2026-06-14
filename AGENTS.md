@@ -18,7 +18,7 @@ npm run db:studio     # Open Prisma Studio GUI (port 5555)
 ```bash
 npm run build              # tsc → dist/
 npm run start              # node dist/index.js
-npm run prisma:seed        # Create default admin (admin@jewel.local / admin123)
+npm run prisma:seed        # Create default admin (admin@vrindaonline.local / admin123)
 ```
 
 ### Frontend apps (apps/web | apps/vendor | apps/admin)
@@ -34,7 +34,7 @@ No test suite is configured.
 npm workspaces monorepo with four apps and two shared packages. All apps communicate with the single Express API over HTTP.
 
 ```
-jewel-marketplace/
+vrindaonline-marketplace/
 ├── apps/
 │   ├── api/        Express + TypeScript backend (port 4000)
 │   ├── web/        Next.js 14 customer storefront (port 3000)

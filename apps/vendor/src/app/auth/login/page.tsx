@@ -56,7 +56,7 @@ function LoginInner() {
       <div className="w-full max-w-sm">
         {/* Logo / brand */}
         <div className="text-center mb-8">
-          <span className="font-display text-3xl text-ink-900">Jewel</span>
+          <span className="font-display text-3xl text-ink-900">Vrindaonline</span>
           <p className="text-sm text-ink-500 mt-1">Vendor portal</p>
         </div>
 
@@ -115,12 +115,12 @@ function LoginInner() {
           </form>
 
           <p className="text-[11px] text-ink-500 text-center mt-5">
-            By continuing, you agree to Jewel's Terms and Privacy Policy.
+            By continuing, you agree to Vrindaonline's Terms and Privacy Policy.
           </p>
         </div>
 
         <p className="text-center text-xs text-ink-500 mt-6">
-          Shopping on Jewel?{' '}
+          Shopping on Vrindaonline?{' '}
           <a href="http://localhost:3000/auth/login" className="text-brand-700 hover:underline">
             Customer login →
           </a>

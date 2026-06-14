@@ -17,7 +17,7 @@ npm run build:all        # Build all five apps in sequence
 ```
 
 ### Production (PM2)
-`ecosystem.config.js` runs all five apps as PM2 processes (`jewel-api`, `jewel-web`, `jewel-vendor`, `jewel-admin`, `jewel-storefront`). Build first (`npm run build:all`), then:
+`ecosystem.config.js` runs all five apps as PM2 processes (`vrindaonline-api`, `vrindaonline-web`, `vrindaonline-vendor`, `vrindaonline-admin`, `vrindaonline-storefront`). Build first (`npm run build:all`), then:
 ```bash
 npm run pm2:start   # / pm2:stop / pm2:restart / pm2:logs / pm2:status
 ```
@@ -26,7 +26,7 @@ npm run pm2:start   # / pm2:stop / pm2:restart / pm2:logs / pm2:status
 ```bash
 npm run build                      # tsc --noCheck → dist/ (type errors are NOT caught at build — run tsc separately to typecheck)
 npm run start                      # node dist/index.js
-npm run prisma:seed                # Create default admin (admin@jewel.local / admin123)
+npm run prisma:seed                # Create default admin (admin@vrindaonline.local / admin123)
 npm run prisma:seed:jewellery-taxonomy   # Seed category tree / mega-menu / attributes (see other prisma:seed:* scripts)
 npm run gen:enc-key                # Generate a value for ENCRYPTION_KEY (required — boot asserts it is set)
 npm run algolia:reindex            # Rebuild the Algolia product index
@@ -45,7 +45,7 @@ No test suite is configured.
 npm workspaces monorepo with five apps and two shared packages. All apps communicate with the single Express API over HTTP.
 
 ```
-jewel-marketplace/
+vrindaonline-marketplace/
 ├── apps/
 │   ├── api/         Express + TypeScript backend (port 4000)
 │   ├── web/         Next.js 14 customer marketplace storefront (port 3000)

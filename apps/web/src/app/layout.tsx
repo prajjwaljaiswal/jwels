@@ -4,7 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import { CartHydrator } from '@/components/CartHydrator';
 
 export const metadata: Metadata = {
-  title: 'Jewel — Handcrafted jewelry marketplace',
+  title: 'Vrindaonline — Handcrafted jewelry marketplace',
   description: 'Discover handcrafted jewelry from independent vendors across India.',
 };
 

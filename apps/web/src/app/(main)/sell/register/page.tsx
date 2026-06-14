@@ -82,7 +82,7 @@ function Inner() {
         <div className="bg-surface border border-line rounded-md shadow-card p-7 md:p-9">
           <h1 className="font-display text-3xl text-ink-900">Become a seller</h1>
           <p className="text-sm text-ink-700 mt-1.5 mb-5">
-            Already selling on Jewel?{' '}
+            Already selling on Vrindaonline?{' '}
             <Link href="/sell/login" className="text-brand-700 font-semibold hover:underline">
               Sign in
             </Link>
@@ -137,7 +137,7 @@ function Inner() {
           </form>
 
           <p className="text-[11px] text-ink-500 text-center mt-5">
-            By creating a seller account, you agree to Jewel's Seller Terms and Privacy Policy.
+            By creating a seller account, you agree to Vrindaonline's Seller Terms and Privacy Policy.
           </p>
         </div>
 

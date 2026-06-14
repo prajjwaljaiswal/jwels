@@ -1,4 +1,4 @@
-# Jewel Marketplace
+# Vrindaonline Marketplace
 
 A multi-vendor jewellery e-commerce platform (B2C, Flipkart/Amazon-style). Vendors register and get manually approved by an admin, then list and sell products. Customers browse the marketplace, add to cart, and check out via Razorpay. The platform earns a flat commission (default 10%) on each order.
 
@@ -19,7 +19,7 @@ A multi-vendor jewellery e-commerce platform (B2C, Flipkart/Amazon-style). Vendo
 npm workspaces monorepo — five apps and two shared packages, all talking to the single Express API over HTTP.
 
 ```
-jewel-marketplace/
+vrindaonline-marketplace/
 ├── apps/
 │   ├── api/         # Express + TypeScript backend         (port 4000)
 │   ├── web/         # Customer marketplace storefront       (port 3000)
@@ -87,7 +87,7 @@ npm run dev:storefront   # http://localhost:3003
 ## Default admin
 
 After seeding:
-- Email: `admin@jewel.local`
+- Email: `admin@vrindaonline.local`
 - Password: `admin123` (change immediately)
 
 The seed also creates system RBAC roles (`SUPER_ADMIN`, `VENDOR_MODERATOR`, `FINANCE`, `CATALOG_MANAGER`, …) used by the admin console.

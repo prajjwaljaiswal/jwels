@@ -132,7 +132,7 @@ export default function HomePage() {
       {/* CTA STRIP */}
       <section className="max-w-container mx-auto px-6 py-16">
         <div className="rounded-md bg-brand-50 p-10 md:p-14 text-center">
-          <h3 className="font-display text-3xl md:text-4xl text-ink-900 mb-3">Sell your craft on Jewel</h3>
+          <h3 className="font-display text-3xl md:text-4xl text-ink-900 mb-3">Sell your craft on Vrindaonline</h3>
           <p className="text-ink-700 max-w-xl mx-auto mb-6">
             Reach thousands of jewelry lovers. We handle payments, you focus on what you make best.
           </p>

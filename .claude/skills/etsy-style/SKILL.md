@@ -1,9 +1,9 @@
 ---
 name: etsy-style
-description: Apply Etsy-inspired visual design to the jewel-marketplace storefront, vendor dashboard, and admin panel. Use when building or restyling any Next.js page in apps/web — product grids, product detail, cart/checkout, auth, vendor shop manager, admin approval/payouts. Encodes Etsy's color palette, typography, spacing, component patterns (product card, filter rail, dashboard shell), and tone so every surface feels like one cohesive marketplace.
+description: Apply Etsy-inspired visual design to the vrindaonline-marketplace storefront, vendor dashboard, and admin panel. Use when building or restyling any Next.js page in apps/web — product grids, product detail, cart/checkout, auth, vendor shop manager, admin approval/payouts. Encodes Etsy's color palette, typography, spacing, component patterns (product card, filter rail, dashboard shell), and tone so every surface feels like one cohesive marketplace.
 ---
 
-# Etsy-Style Design Skill — Jewel Marketplace
+# Etsy-Style Design Skill — Vrindaonline Marketplace
 
 This skill captures Etsy's marketplace design language and adapts it for the three audiences in this app: **shoppers** (storefront), **vendors** (shop manager), and **admins** (operations console). Use it any time you generate or edit UI in `apps/web`.
 

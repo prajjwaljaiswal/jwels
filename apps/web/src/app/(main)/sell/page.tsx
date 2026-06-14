@@ -4,7 +4,7 @@ const PERKS = [
   { title: 'Reach jewelry lovers', body: 'List your handcrafted pieces in front of buyers actively shopping for unique jewelry.' },
   { title: 'Free to list', body: 'No listing fees, no monthly subscriptions. Open your shop and start selling for free.' },
   { title: 'Weekly payouts', body: 'Earnings settle to your bank account every week once orders are delivered.' },
-  { title: 'Branded storefront', body: 'Your own logo, banner, theme, and shop URL on Jewel.' },
+  { title: 'Branded storefront', body: 'Your own logo, banner, theme, and shop URL on Vrindaonline.' },
 ];
 
 const STEPS = [
@@ -20,12 +20,12 @@ export default function SellLandingPage() {
       {/* Hero */}
       <section className="py-16 md:py-24 grid lg:grid-cols-2 gap-12 items-center">
         <div>
-          <p className="text-xs uppercase tracking-widest text-brand-700 font-semibold mb-3">Sell on Jewel</p>
+          <p className="text-xs uppercase tracking-widest text-brand-700 font-semibold mb-3">Sell on Vrindaonline</p>
           <h1 className="font-display text-4xl md:text-5xl text-ink-900 leading-tight">
             Turn your craft into a thriving jewelry shop.
           </h1>
           <p className="text-ink-700 mt-4 max-w-lg">
-            Join independent jewelers across India selling on Jewel. Open your shop, list your pieces,
+            Join independent jewelers across India selling on Vrindaonline. Open your shop, list your pieces,
             and reach buyers who love handcrafted, hallmarked jewelry.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -45,7 +45,7 @@ export default function SellLandingPage() {
 
       {/* Perks */}
       <section className="py-12 border-t border-line">
-        <h2 className="font-display text-3xl text-ink-900 mb-8">Why sell on Jewel</h2>
+        <h2 className="font-display text-3xl text-ink-900 mb-8">Why sell on Vrindaonline</h2>
         <div className="grid md:grid-cols-2 gap-6">
           {PERKS.map((p) => (
             <div key={p.title} className="bg-surface border border-line rounded-md p-6">

@@ -341,7 +341,7 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
             <input className="input-field" value={form.shopName} maxLength={60}
               onChange={(e) => patch('shopName', e.target.value)} />
           </Field>
-          <Field label="URL handle (slug)" hint={`jewel.com/store/${form.slug || 'your-shop'}`}>
+          <Field label="URL handle (slug)" hint={`vrindaonline.com/store/${form.slug || 'your-shop'}`}>
             <input className="input-field font-mono" value={form.slug} maxLength={60}
               placeholder="your-shop-name"
               onChange={(e) => patch('slug', e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />

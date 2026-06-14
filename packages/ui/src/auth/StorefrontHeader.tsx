@@ -57,7 +57,7 @@ export function StorefrontHeader({ vendor, themeConfig: t, vendorKey }: Props) {
             </div>
           </Link>
         ) : (
-          <span className="font-bold text-xl" style={{ color: primary }}>Jewel</span>
+          <span className="font-bold text-xl" style={{ color: primary }}>Vrindaonline</span>
         )}
 
         <div className="flex-1" />

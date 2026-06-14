@@ -386,7 +386,7 @@ export default function CheckoutPage() {
         amount: checkout.amount,
         currency: checkout.currency,
         order_id: checkout.razorpayOrderId,
-        name: 'Jewel Marketplace',
+        name: 'Vrindaonline Marketplace',
         prefill: { name: addr.name, contact: addr.phone },
         handler: async (response: any) => {
           try {

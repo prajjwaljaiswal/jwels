@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'Jewel — Vendor Dashboard',
-  description: 'Manage your jewellery shop on Jewel marketplace.',
+  title: 'Vrindaonline — Vendor Dashboard',
+  description: 'Manage your jewellery shop on Vrindaonline marketplace.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

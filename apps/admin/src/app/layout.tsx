@@ -3,8 +3,8 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'Jewel — Admin Console',
-  description: 'Operations console for Jewel marketplace admins.',
+  title: 'Vrindaonline — Admin Console',
+  description: 'Operations console for Vrindaonline marketplace admins.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

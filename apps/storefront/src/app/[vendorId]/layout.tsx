@@ -366,7 +366,7 @@ function Footer() {
       <div className="border-t" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
         <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs opacity-70">
           <span>{t.footer.copyright || `© ${new Date().getFullYear()} ${vendor.shopName}. All rights reserved.`}</span>
-          <span>Powered by <a href={`${process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000'}`} className="hover:underline">Jewel Marketplace</a></span>
+          <span>Powered by <a href={`${process.env.NEXT_PUBLIC_WEB_URL || 'http://localhost:3000'}`} className="hover:underline">Vrindaonline Marketplace</a></span>
         </div>
       </div>
     </footer>

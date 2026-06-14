@@ -1,4 +1,4 @@
-// Prisma schema for jewel-marketplace
+// Prisma schema for vrindaonline-marketplace
 // docs: https://pris.ly/d/prisma-schema
 
 generator client {

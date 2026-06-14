@@ -94,7 +94,7 @@ const PROMISES = [
 
 const FAQS = [
   {
-    q: 'How much does it cost to sell on Jewel?',
+    q: 'How much does it cost to sell on Vrindaonline?',
     a: "Zero to start. There's no listing fee, no monthly subscription, and no annual contract. Opening your shop and listing your products is completely free.",
   },
   {
@@ -110,7 +110,7 @@ const FAQS = [
     a: 'You can start without GST if your annual turnover is under ₹40 lakh. Above that, GST registration is required by law. We issue GST-compliant invoices from day one for both you and your customers.',
   },
   {
-    q: 'How does Jewel verify artisans?',
+    q: 'How does Vrindaonline verify artisans?',
     a: 'Every new shop is reviewed by our team before going live. We verify your identity (PAN/Aadhaar), bank account, and a small sample of pieces. For gold and gemstone listings, we require BIS hallmarking and IGI/SGL certificates respectively.',
   },
 ];
@@ -158,7 +158,7 @@ export default function HomePage() {
           <div className="absolute top-6 left-0 right-0 z-20">
             <div className="max-w-container mx-auto px-6 flex items-center justify-between">
               <span className="font-display text-3xl text-brand-600 leading-none drop-shadow-sm">
-                Jewel
+                Vrindaonline
               </span>
               <div className="hidden md:flex items-center gap-3">
                 <Link
@@ -221,7 +221,7 @@ export default function HomePage() {
                   <ArrowRight />
                 </MagneticButton>
                 <MagneticButton href="#sell" variant="secondary">
-                  Sell on Jewel
+                  Sell on Vrindaonline
                   <Sparkle />
                 </MagneticButton>
               </div>
@@ -301,7 +301,7 @@ export default function HomePage() {
       <section className="max-w-container mx-auto px-6 py-20 md:py-28">
         <Reveal as="div" className="text-center max-w-2xl mx-auto mb-14">
           <p className="text-xs uppercase tracking-[0.2em] text-brand-700 font-semibold mb-3 inline-block eyebrow-underline">
-            How Jewel works
+            How Vrindaonline works
           </p>
           <h2 className="font-display text-4xl md:text-5xl text-ink-900">
             A fairer <span className="text-gradient-warm italic">marketplace</span> for makers and lovers of beautiful things.
@@ -536,9 +536,9 @@ export default function HomePage() {
                   <span className="text-[10px] uppercase tracking-[0.18em] font-semibold">Founder's note</span>
                 </div>
                 <p className="text-xs text-ink-700 leading-relaxed">
-                  “We built Jewel because India's independent jewellery makers deserve better than 30% cuts and pay-to-play listings.”
+                  “We built Vrindaonline because India's independent jewellery makers deserve better than 30% cuts and pay-to-play listings.”
                 </p>
-                <p className="text-xs font-semibold text-ink-900 mt-2">— The Jewel team</p>
+                <p className="text-xs font-semibold text-ink-900 mt-2">— The Vrindaonline team</p>
               </div>
             </Parallax>
           </Reveal>
@@ -555,7 +555,7 @@ export default function HomePage() {
             </Reveal>
             <Reveal delay={150}>
               <p className="text-lg text-ink-700 mb-6 max-w-lg">
-                Behind every piece on Jewel is a person — a goldsmith in Jaipur, a silversmith in Cuttack, a designer
+                Behind every piece on Vrindaonline is a person — a goldsmith in Jaipur, a silversmith in Cuttack, a designer
                 in Bandra. Our job is to give them a stage, not to tax their craft.
               </p>
             </Reveal>
@@ -614,7 +614,7 @@ export default function HomePage() {
           </Reveal>
           <Reveal delay={300}>
             <p className="mt-8 text-sm uppercase tracking-[0.25em] text-white/60">
-              The Jewel Marketplace · Est. 2026
+              The Vrindaonline Marketplace · Est. 2026
             </p>
           </Reveal>
         </div>
@@ -758,7 +758,7 @@ export default function HomePage() {
       <footer className="border-t border-line bg-canvas">
         <div className="max-w-container mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <span className="font-display text-2xl text-brand-600">Jewel</span>
+            <span className="font-display text-2xl text-brand-600">Vrindaonline</span>
             <span className="text-xs text-ink-500">Handcrafted marketplace · India · Est. 2026</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-ink-700">
@@ -768,7 +768,7 @@ export default function HomePage() {
             <Link href="/login" className="hover:text-brand-700">Sign in</Link>
           </div>
           <div className="text-xs text-ink-500">
-            © {new Date().getFullYear()} Jewel Marketplace. All rights reserved.
+            © {new Date().getFullYear()} Vrindaonline Marketplace. All rights reserved.
           </div>
         </div>
       </footer>

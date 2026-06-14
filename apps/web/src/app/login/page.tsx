@@ -95,7 +95,7 @@ function LoginInner() {
           />
           <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/60 to-transparent">
             <p className="font-display text-3xl text-white leading-tight">
-              Welcome back to Jewel.
+              Welcome back to Vrindaonline.
             </p>
             <p className="text-white/80 text-sm mt-1">Your favorites are right where you left them.</p>
           </div>
@@ -107,7 +107,7 @@ function LoginInner() {
         <div className="bg-surface border border-line rounded-md shadow-card p-7 md:p-9">
           <h1 className="font-display text-3xl text-ink-900">Sign in</h1>
           <p className="text-sm text-ink-700 mt-1.5 mb-6">
-            New to Jewel?{' '}
+            New to Vrindaonline?{' '}
             <Link href="/register" className="text-brand-700 font-semibold hover:underline">
               Create an account
             </Link>
@@ -148,7 +148,7 @@ function LoginInner() {
           </form>
 
           <p className="text-[11px] text-ink-500 text-center mt-5">
-            By continuing, you agree to Jewel's Terms and Privacy Policy.
+            By continuing, you agree to Vrindaonline's Terms and Privacy Policy.
           </p>
         </div>
 
