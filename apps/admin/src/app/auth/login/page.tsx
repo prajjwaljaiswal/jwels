@@ -116,9 +116,9 @@ function LoginInner() {
           </p>
         </div>
 
-        <p className="text-center text-xs text-ink-500 mt-6">
+        {/* <p className="text-center text-xs text-ink-500 mt-6">
           Default seed account: <span className="font-mono text-ink-700">admin@vrindaonline.local / admin123</span>
-        </p>
+        </p> */}
       </div>
     </div>
   );
