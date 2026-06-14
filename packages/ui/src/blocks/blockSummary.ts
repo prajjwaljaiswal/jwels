@@ -60,6 +60,10 @@ export function getBlockSummary(block: Block): string {
       const n = (s.items?.length ?? 0);
       return trim(s.heading) || `${n} image${n !== 1 ? 's' : ''}`;
     }
+    case 'imageSlider': {
+      const n = (s.slides?.length ?? 0);
+      return `Slider · ${n} slide${n !== 1 ? 's' : ''}${s.autoplay ? ' · auto' : ''}`;
+    }
     case 'emailCapture':
       return trim(s.heading) || 'Email capture';
 

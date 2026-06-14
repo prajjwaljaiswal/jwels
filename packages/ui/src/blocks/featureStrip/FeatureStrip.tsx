@@ -26,10 +26,10 @@ export function FeatureStripRenderer({ settings: s }: { settings: FeatureStripSe
     <section className={`w-full ${bgClass[s.background]} border-y border-line`}>
       <div className="max-w-container mx-auto px-6 py-4">
         {s.heading && <p className="text-center text-xs uppercase tracking-wider font-semibold text-ink-700 mb-3">{s.heading}</p>}
-        <div className="flex items-center justify-around flex-wrap gap-4 text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-4 text-sm">
           {s.items.map((it, i) => {
             const inner = (
-              <div className="flex items-center gap-2 text-ink-700">
+              <div className="flex items-center justify-center gap-2 text-ink-700 text-center">
                 {it.iconUrl && <img src={it.iconUrl} alt="" className="h-6 w-6 object-contain" />}
                 <div className="leading-tight">
                   <p className="font-semibold text-ink-900">{it.label}</p>

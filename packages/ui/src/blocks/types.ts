@@ -14,6 +14,7 @@ export type BlockType =
   | 'editorialCards'
   | 'iconGrid'
   | 'imageStrip'
+  | 'imageSlider'
   | 'emailCapture'
   // PDP-specific blocks
   | 'pdpGallery'

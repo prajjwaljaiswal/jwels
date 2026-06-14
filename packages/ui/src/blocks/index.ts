@@ -25,6 +25,8 @@ import { IconGridRenderer, defaultIconGrid } from './iconGrid/IconGrid';
 import { IconGridEditor } from './iconGrid/IconGridEditor';
 import { ImageStripRenderer, defaultImageStrip } from './imageStrip/ImageStrip';
 import { ImageStripEditor } from './imageStrip/ImageStripEditor';
+import { ImageSliderRenderer, defaultImageSlider } from './imageSlider/ImageSlider';
+import { ImageSliderEditor } from './imageSlider/ImageSliderEditor';
 import { EmailCaptureRenderer, defaultEmailCapture } from './emailCapture/EmailCapture';
 import { EmailCaptureEditor } from './emailCapture/EmailCaptureEditor';
 import { SYSTEM_BLOCK_DEFINITIONS } from './system/factory';
@@ -148,6 +150,15 @@ const LEGACY_BLOCK_REGISTRY: Partial<Record<BlockType, BlockDefinition>> = {
     defaultSettings: defaultImageStrip,
     Renderer: ImageStripRenderer as any,
     Editor: ImageStripEditor as any,
+  },
+  imageSlider: {
+    type: 'imageSlider',
+    label: 'Image slider',
+    description: 'Full-width auto-rotating banner carousel — upload multiple images',
+    icon: '🎠',
+    defaultSettings: defaultImageSlider,
+    Renderer: ImageSliderRenderer as any,
+    Editor: ImageSliderEditor as any,
   },
   emailCapture: {
     type: 'emailCapture',

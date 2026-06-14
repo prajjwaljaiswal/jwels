@@ -55,44 +55,63 @@ function img(id: string, params = 'w=800&fit=crop&q=80') {
   return `https://images.unsplash.com/photo-${id}?${params}`;
 }
 
-// Curated jewelry Unsplash photo IDs
+// Curated jewelry Unsplash photo IDs.
+// NOTE: these are limited to a browser-verified pool — every ID below renders
+// (confirmed in-browser on the live storefront). The previous set contained dead
+// IDs (e.g. 1532667449560…, 1554412933…, 1573408301185-9519f94815b3) that 404 and
+// showed broken images on product cards / PDP galleries. Unsplash rejects
+// non-browser HEAD/GET requests, so validity can only be confirmed in a browser —
+// if you add new IDs, verify them by loading the storefront, not via curl.
+const P = {
+  ringFlat:  '1605100804763-247f67b3557e', // ring flatlay
+  ringBench: '1611591437281-460bfbe1220a', // ring / jeweller's bench
+  stack:     '1617038220319-276d3cfab638', // stacked rings & earrings
+  neck:      '1599643478518-a784e5dc4c8f', // necklace
+  neckLayer: '1515562141207-7a88fb7ce338', // layered necklaces (on-model)
+  styling:   '1573408301185-9146fe634ad0', // styled jewellery / editorial
+  earrings:  '1535632066927-ab7c9ab60908', // earrings
+  earDrop:   '1602173574767-37ac01994b2a', // drop earrings (on-model)
+  bangle:    '1611652022419-a9419f74343d', // bangle
+  bangleArm: '1588444650733-d0767b753fc8', // bangles on the wrist (on-model)
+};
+
 const PHOTOS = {
   // Rings
-  ringGold1:    ['1515562141207-7a88fb7ce338', '1573408301185-9519f94815b3', '1611591437281-460bfbe1220a'],
-  ringDiamond:  ['1605100804763-247f67b3557e', '1569582825425-59a9d1b35b05', '1583370573396-cb27bd2f5a1a'],
-  ringRoseGold: ['1598836985580-abb05b3c28a2', '1515562141207-7a88fb7ce338', '1490312278390-ab24aa6b2a67'],
-  ringRuby:     ['1573408301185-9519f94815b3', '1515562141207-7a88fb7ce338', '1611591437281-460bfbe1220a'],
-  ringEmerald:  ['1490312278390-ab24aa6b2a67', '1573408301185-9519f94815b3', '1605100804763-247f67b3557e'],
-  ringPlatinum: ['1569582825425-59a9d1b35b05', '1490312278390-ab24aa6b2a67', '1611591437281-460bfbe1220a'],
+  ringGold1:    [P.ringFlat, P.ringBench, P.stack],
+  ringDiamond:  [P.ringFlat, P.stack, P.ringBench],
+  ringRoseGold: [P.ringBench, P.ringFlat, P.stack],
+  ringRuby:     [P.ringFlat, P.ringBench, P.stack],
+  ringEmerald:  [P.ringBench, P.stack, P.ringFlat],
+  ringPlatinum: [P.stack, P.ringFlat, P.ringBench],
 
   // Necklaces
-  neckGold:     ['1599643478518-a784e5dc4c8f', '1601121781101-dbaeae7e3e06', '1548048026-5a1a941d93d3'],
-  neckDiamond:  ['1526434426615-1abe81efcb0b', '1599643478518-a784e5dc4c8f', '1600493033274-0efbb832b3c5'],
-  neckPearl:    ['1506630448388-4e683c67ddb0', '1526434426615-1abe81efcb0b', '1548048026-5a1a941d93d3'],
-  neckRoseGold: ['1601121781101-dbaeae7e3e06', '1599643478518-a784e5dc4c8f', '1607703703520-27c6a8a9cd26'],
-  neckSilver:   ['1548048026-5a1a941d93d3', '1601121781101-dbaeae7e3e06', '1599643478518-a784e5dc4c8f'],
+  neckGold:     [P.neck, P.neckLayer, P.styling],
+  neckDiamond:  [P.neckLayer, P.neck, P.styling],
+  neckPearl:    [P.styling, P.neck, P.neckLayer],
+  neckRoseGold: [P.neck, P.styling, P.neckLayer],
+  neckSilver:   [P.neckLayer, P.neck, P.styling],
 
   // Earrings
-  earGold:      ['1543294001-f1cd7ea036f3', '1617038220319-276d3cfab638', '1598560917374-edd4b78a2f12'],
-  earDiamond:   ['1617038220319-276d3cfab638', '1543294001-f1cd7ea036f3', '1635767798638-3665a0a107fc'],
-  earRoseGold:  ['1598560917374-edd4b78a2f12', '1543294001-f1cd7ea036f3', '1617038220319-276d3cfab638'],
-  earPearl:     ['1635767798638-3665a0a107fc', '1617038220319-276d3cfab638', '1543294001-f1cd7ea036f3'],
-  earRuby:      ['1543294001-f1cd7ea036f3', '1598560917374-edd4b78a2f12', '1635767798638-3665a0a107fc'],
+  earGold:      [P.earrings, P.earDrop, P.stack],
+  earDiamond:   [P.earDrop, P.earrings, P.stack],
+  earRoseGold:  [P.stack, P.earrings, P.earDrop],
+  earPearl:     [P.earrings, P.stack, P.earDrop],
+  earRuby:      [P.earDrop, P.stack, P.earrings],
 
   // Bangles
-  bangleGold:   ['1535632066927-ab7c9ab60908', '1573408301185-9519f94815b3', '1532667449560-72a95c8d8456'],
-  bangleDiamond:['1532667449560-72a95c8d8456', '1535632066927-ab7c9ab60908', '1573408301185-9519f94815b3'],
-  bangleRoseGold:['1573408301185-9519f94815b3', '1535632066927-ab7c9ab60908', '1532667449560-72a95c8d8456'],
+  bangleGold:    [P.bangle, P.bangleArm, P.earrings],
+  bangleDiamond: [P.bangleArm, P.bangle, P.earrings],
+  bangleRoseGold:[P.bangle, P.earrings, P.bangleArm],
 
   // Bracelets
-  braceletGold:  ['1554412933-514eb6faf9b3', '1617038220319-276d3cfab638', '1532667449560-72a95c8d8456'],
-  braceletPearl: ['1532667449560-72a95c8d8456', '1506630448388-4e683c67ddb0', '1554412933-514eb6faf9b3'],
-  braceletRose:  ['1617038220319-276d3cfab638', '1554412933-514eb6faf9b3', '1532667449560-72a95c8d8456'],
+  braceletGold:  [P.bangleArm, P.stack, P.bangle],
+  braceletPearl: [P.stack, P.bangleArm, P.bangle],
+  braceletRose:  [P.bangle, P.bangleArm, P.stack],
 
   // Pendants
-  pendantGold:   ['1571027832879-05780c13e6b2', '1607703703520-27c6a8a9cd26', '1599643478518-a784e5dc4c8f'],
-  pendantDiamond:['1607703703520-27c6a8a9cd26', '1571027832879-05780c13e6b2', '1526434426615-1abe81efcb0b'],
-  pendantEmerald:['1526434426615-1abe81efcb0b', '1571027832879-05780c13e6b2', '1607703703520-27c6a8a9cd26'],
+  pendantGold:   [P.neck, P.styling, P.neckLayer],
+  pendantDiamond:[P.styling, P.neck, P.neckLayer],
+  pendantEmerald:[P.neckLayer, P.styling, P.neck],
 };
 
 interface ProductDef {

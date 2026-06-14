@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { useVendor } from "@/lib/vendor-context";
+import { useVendor, useStoreReveal } from "@/lib/vendor-context";
 import { BlockRenderer } from "@/components/blocks/BlockRenderer";
 import type { Block } from "@/components/blocks/types";
 
@@ -11,9 +11,9 @@ interface PublishedPage {
   blocks: Block[];
 }
 
-
 export default function StorefrontHome() {
   const { vendor } = useVendor();
+  const reveal = useStoreReveal();
 
   const [homepage, setHomepage] = useState<PublishedPage | null>(null);
 
@@ -36,6 +36,7 @@ export default function StorefrontHome() {
         <BlockRenderer
           blocks={homepage!.blocks}
           ctx={{ scope: "vendor", vendorId: vendor.id }}
+          reveal={reveal}
         />
       ) : (
         <h2>Loading...</h2>

@@ -13,6 +13,11 @@ import { SearchAutosuggest } from '@/components/search/SearchAutosuggest';
 const ALGOLIA_READY =
   !!process.env.NEXT_PUBLIC_ALGOLIA_APP_ID && !!process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
 
+// Scroll-reveal transition duration per vendor-chosen animation speed.
+const REVEAL_DURATION: Record<'slow' | 'normal' | 'fast', string> = {
+  slow: '1200ms', normal: '800ms', fast: '450ms',
+};
+
 export default function VendorStoreLayout({ children }: { children: React.ReactNode }) {
   const { vendorId } = useParams<{ vendorId: string }>();
   const [vendor, setVendor] = useState<VendorBrand | null>(null);
@@ -53,7 +58,29 @@ export default function VendorStoreLayout({ children }: { children: React.ReactN
 }
 
 function ThemedShell({ children }: { children: React.ReactNode }) {
-  const { themeConfig: t } = useVendor();
+  const { themeConfig: t, vendor } = useVendor();
+
+  // Apply the vendor's favicon to the storefront tab. The root layout is static,
+  // so we set <link rel="icon"> client-side from the vendor's theme.
+  useEffect(() => {
+    const href = t.faviconUrl;
+    if (!href) return;
+    let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    const prev = link.href;
+    link.href = href;
+    return () => { if (link) link.href = prev; };
+  }, [t.faviconUrl]);
+
+  // Reflect the shop name in the tab title alongside its favicon.
+  useEffect(() => {
+    if (vendor?.shopName) document.title = vendor.shopName;
+  }, [vendor?.shopName]);
+
   const cssVars: React.CSSProperties & Record<string, string> = {
     '--store-color': t.colors.primary,
     '--store-accent': t.colors.accent,
@@ -65,13 +92,16 @@ function ThemedShell({ children }: { children: React.ReactNode }) {
     '--store-footer-text': t.colors.footerText,
     '--store-heading-font': FONT_STACKS[t.typography.headingFont],
     '--store-body-font': FONT_STACKS[t.typography.bodyFont],
+    '--reveal-duration': REVEAL_DURATION[t.animations?.speed ?? 'normal'],
     background: t.colors.background,
     color: t.colors.text,
     fontFamily: FONT_STACKS[t.typography.bodyFont],
   };
 
+  const hoverFx = t.animations?.enabled && t.animations?.hover;
+
   return (
-    <div className="vendor-themed min-h-screen flex flex-col" style={cssVars}>
+    <div className={`vendor-themed min-h-screen flex flex-col${hoverFx ? ' store-anim-hover' : ''}`} style={cssVars}>
       <ThemedTokensCss />
       <Header />
       <CategoryNav />
@@ -149,62 +179,87 @@ function Header() {
           {t.header.announcement}
         </div>
       )}
-      <div className="max-w-6xl mx-auto px-5 h-16 flex items-center gap-4">
-        <Link href={`/${storeKey}`} className="flex items-center gap-3 min-w-0">
-          {vendor.shopLogoUrl
-            ? <img src={vendor.shopLogoUrl} alt={vendor.shopName} className="h-14 w-auto max-w-[160px] object-contain shrink-0" />
-            : <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-lg shrink-0" style={{ background: theme }}>
-                {vendor.shopName[0].toUpperCase()}
-              </div>}
-          <div className="min-w-0 hidden sm:block">
-            <p
-              className="text-lg leading-tight font-bold truncate"
-              style={{ color: theme, fontFamily: FONT_STACKS[t.typography.headingFont] }}
+      <div className="max-w-6xl mx-auto px-4 sm:px-5">
+        <div className="h-16 flex items-center gap-3">
+          <Link href={`/${storeKey}`} className="flex items-center gap-3 min-w-0 shrink-0">
+            {vendor.shopLogoUrl ? (
+              // Bare logo — no circle/rectangle wrapper. Height & max-width come from
+              // the vendor's theme (set in the dashboard); width stays auto. Logo is
+              // capped a bit smaller on mobile so it never crowds the icons.
+              <img
+                src={vendor.shopLogoUrl}
+                alt={vendor.shopName}
+                className="w-auto object-contain shrink-0 max-h-10 sm:max-h-none"
+                style={{ height: t.header.logoHeight ?? 48, maxWidth: t.header.logoMaxWidth || undefined }}
+              />
+            ) : (
+              <div className="min-w-0">
+                <p
+                  className="text-base sm:text-lg leading-tight font-bold truncate"
+                  style={{ color: theme, fontFamily: FONT_STACKS[t.typography.headingFont] }}
+                >
+                  {vendor.shopName}
+                </p>
+                {vendor.tagline && <p className="text-xs opacity-70 truncate hidden sm:block">{vendor.tagline}</p>}
+              </div>
+            )}
+          </Link>
+
+          {/* Inline search — tablet / desktop only */}
+          {ALGOLIA_READY ? (
+            <div className="hidden sm:flex flex-1 justify-center min-w-0">
+              <SearchAutosuggest
+                vendorId={vendor.id}
+                searchBasePath={`/${storeKey}/products`}
+                placeholder={`Search ${vendor.shopName}…`}
+                className="w-full max-w-xl"
+              />
+            </div>
+          ) : (
+            <div className="hidden sm:block flex-1" />
+          )}
+
+          {isStorefront && (
+            <nav className="hidden lg:flex items-center gap-6 text-sm font-medium shrink-0">
+              {navLinks.map((l, i) => (
+                <Link key={i} href={l.href} className="hover:opacity-70 transition-opacity">{l.label}</Link>
+              ))}
+            </nav>
+          )}
+
+          {/* Account + cart — pushed right on mobile (search lives on its own row) */}
+          <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" style={{ color: t.colors.headerText }}>
+            <AccountMenu storeKey={storeKey} />
+            <Link
+              href={`/${storeKey}/cart`}
+              className="relative h-10 w-10 rounded-full flex items-center justify-center border hover:opacity-80 transition-colors shrink-0"
+              style={{ borderColor: 'rgba(0,0,0,0.15)' }}
+              aria-label="Cart"
             >
-              {vendor.shopName}
-            </p>
-            {vendor.tagline && <p className="text-xs opacity-70 truncate hidden sm:block">{vendor.tagline}</p>}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" />
+                <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6" />
+              </svg>
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: theme }}>
+                  {cartCount}
+                </span>
+              )}
+            </Link>
           </div>
-        </Link>
-
-        {ALGOLIA_READY ? (
-          <SearchAutosuggest
-            vendorId={vendor.id}
-            searchBasePath={`/${storeKey}/products`}
-            placeholder={`Search ${vendor.shopName}…`}
-            className="flex-1 max-w-xl ml-3 sm:mx-2"
-          />
-        ) : (
-          <div className="flex-1" />
-        )}
-
-        {isStorefront && (
-          <nav className="hidden lg:flex items-center gap-6 text-sm font-medium">
-            {navLinks.map((l, i) => (
-              <Link key={i} href={l.href} className="hover:opacity-70 transition-opacity">{l.label}</Link>
-            ))}
-          </nav>
-        )}
-
-        <div className="flex items-center text-sm shrink-0" style={{ color: t.colors.headerText }}>
-          <AccountMenu storeKey={storeKey} />
         </div>
 
-        <Link
-          href={`/${storeKey}/cart`}
-          className="relative h-10 w-10 rounded-full flex items-center justify-center border hover:opacity-80 transition-colors shrink-0"
-          style={{ borderColor: 'rgba(0,0,0,0.15)' }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" />
-            <path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6" />
-          </svg>
-          {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full text-white text-[10px] font-bold flex items-center justify-center" style={{ background: theme }}>
-              {cartCount}
-            </span>
-          )}
-        </Link>
+        {/* Full-width search row — mobile only */}
+        {ALGOLIA_READY && (
+          <div className="sm:hidden pb-3 -mt-1">
+            <SearchAutosuggest
+              vendorId={vendor.id}
+              searchBasePath={`/${storeKey}/products`}
+              placeholder={`Search ${vendor.shopName}…`}
+              className="w-full"
+            />
+          </div>
+        )}
       </div>
     </header>
   );

@@ -6,7 +6,7 @@
 
 import type { Block } from './blockSchemas';
 
-export type PresetKey = 'classic' | 'modern' | 'minimal' | 'luxury' | 'boutique';
+export type PresetKey = 'classic' | 'modern' | 'minimal' | 'luxury' | 'boutique' | 'heirloom' | 'luxe';
 
 export type SystemPageKind = 'HOMEPAGE' | 'PDP' | 'CART' | 'CHECKOUT';
 
@@ -23,7 +23,21 @@ export interface ThemeConfig {
   typography?: { headingFont?: 'serif' | 'sans' | 'display'; bodyFont?: 'serif' | 'sans' };
   header?: any;
   footer?: any;
+  animations?: {
+    enabled: boolean;
+    style: 'fade' | 'fade-up' | 'left' | 'right' | 'zoom';
+    speed: 'slow' | 'normal' | 'fast';
+    stagger: boolean;
+    hover: boolean;
+  };
 }
+
+// Curated scroll-reveal presets, matched to each theme's personality.
+const anim = (
+  style: 'fade' | 'fade-up' | 'left' | 'right' | 'zoom',
+  speed: 'slow' | 'normal' | 'fast' = 'normal',
+  hover = true,
+): ThemeConfig['animations'] => ({ enabled: true, style, speed, stagger: true, hover });
 
 export interface Preset {
   meta: PresetMeta;
@@ -37,11 +51,39 @@ const bid = (() => {
   return (prefix: string) => `${prefix}_${++n}`;
 })();
 
+// ── Curated default imagery ──────────────────────────────────────────────────
+// Ship-ready Unsplash jewellery photos used as block defaults so image-bearing
+// blocks (hero / categoryTiles / imageStrip / editorialCards) render attractively
+// and pass the strict `url` validation in blockSchemas.ts out of the box. Vendors
+// swap these for their own imagery in the page editor. Convention mirrors
+// apps/api/prisma/seed-products.ts (images.unsplash.com hotlinks with crop params).
+const IMG = (id: string, w = 1200) =>
+  `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
+
+const HERO_IMG       = IMG('1605100804763-247f67b3557e', 2000); // gold jewellery flatlay
+const STORY_IMG      = IMG('1611591437281-460bfbe1220a', 1200); // jeweller at the bench
+const CAT_RINGS      = IMG('1605100804763-247f67b3557e', 800);
+const CAT_NECKLACES  = IMG('1599643478518-a784e5dc4c8f', 800);
+const CAT_EARRINGS   = IMG('1535632066927-ab7c9ab60908', 800);
+const CAT_BANGLES    = IMG('1611652022419-a9419f74343d', 800);
+const LIFE_1         = IMG('1515562141207-7a88fb7ce338', 900);
+const LIFE_2         = IMG('1617038220319-276d3cfab638', 900);
+const LIFE_3         = IMG('1602173574767-37ac01994b2a', 900);
+const LIFE_4         = IMG('1588444650733-d0767b753fc8', 900);
+const JOURNAL_1      = IMG('1599643478518-a784e5dc4c8f', 900);
+const JOURNAL_2      = IMG('1573408301185-9146fe634ad0', 900);
+const JOURNAL_3      = IMG('1535632066927-ab7c9ab60908', 900);
+
 // ── Reusable block factories ────────────────────────────────────────────────
 // All factories return blocks that satisfy the strict zod schemas in
 // blockSchemas.ts so they pass `validateBlocksForKind` at save/publish time.
 
-const heroBanner = (headline: string, sub: string, ctaLabel = 'Shop the collection'): Block => ({
+const heroBanner = (
+  headline: string,
+  sub: string,
+  ctaLabel = 'Shop the collection',
+  backgroundImageUrl = HERO_IMG,
+): Block => ({
   id: bid('hero'),
   type: 'hero',
   settings: {
@@ -49,7 +91,7 @@ const heroBanner = (headline: string, sub: string, ctaLabel = 'Shop the collecti
     subheadline: sub,
     ctaLabel,
     ctaHref: '/products',
-    backgroundImageUrl: '',
+    backgroundImageUrl,
     alignment: 'center',
     height: 'lg',
   },
@@ -76,16 +118,62 @@ const trustStrip = (background: 'none' | 'canvas' | 'brand' = 'canvas'): Block =
   },
 } as any);
 
-const brandStory = (heading: string, body: string): Block => ({
+const brandStory = (heading: string, body: string, imageUrl = STORY_IMG): Block => ({
   id: bid('story'),
   type: 'imageWithText',
   settings: {
-    imageUrl: '',
+    imageUrl,
     imagePosition: 'left',
     heading,
     body,
     ctaLabel: 'Read our story',
     ctaHref: '/about',
+  },
+} as any);
+
+// Shop-by-type tiles — the category navigation top jewellery sites lead with.
+const categoryTiles = (): Block => ({
+  id: bid('cats'),
+  type: 'categoryTiles',
+  settings: {
+    heading: 'Shop by category',
+    columns: 4,
+    items: [
+      { imageUrl: CAT_RINGS,     title: 'Rings',     href: '/products?category=rings',     overlay: true },
+      { imageUrl: CAT_NECKLACES, title: 'Necklaces', href: '/products?category=necklaces', overlay: true },
+      { imageUrl: CAT_EARRINGS,  title: 'Earrings',  href: '/products?category=earrings',  overlay: true },
+      { imageUrl: CAT_BANGLES,   title: 'Bangles',   href: '/products?category=bangles',   overlay: true },
+    ],
+  },
+} as any);
+
+// On-model / lifestyle photography row — answers "how will it look on me?".
+const lifestyleStrip = (): Block => ({
+  id: bid('life'),
+  type: 'imageStrip',
+  settings: {
+    heading: 'Worn every day',
+    aspect: '4:5',
+    items: [
+      { imageUrl: LIFE_1, alt: 'Layered gold necklaces, styled', href: '/products' },
+      { imageUrl: LIFE_2, alt: 'Stacked rings on hand',           href: '/products' },
+      { imageUrl: LIFE_3, alt: 'Drop earrings, close-up',         href: '/products' },
+      { imageUrl: LIFE_4, alt: 'Bangles on the wrist',            href: '/products' },
+    ],
+  },
+} as any);
+
+// Editorial / journal cards — storytelling + styling guidance.
+const journalCards = (): Block => ({
+  id: bid('journal'),
+  type: 'editorialCards',
+  settings: {
+    heading: 'From the journal',
+    items: [
+      { imageUrl: JOURNAL_1, eyebrow: 'Style guide', title: 'How to layer necklaces', body: 'Mixing lengths and metals for an effortless, collected look.', ctaLabel: 'Read & shop', ctaHref: '/products?category=necklaces' },
+      { imageUrl: JOURNAL_2, eyebrow: 'Care',        title: 'Caring for your gold',   body: 'Simple habits to keep every piece bright for generations.',     ctaLabel: 'Read more',   ctaHref: '/about' },
+      { imageUrl: JOURNAL_3, eyebrow: 'Gifting',     title: 'The gifting edit',       body: 'Pieces they will reach for long after the occasion.',            ctaLabel: 'Shop gifts',  ctaHref: '/products' },
+    ],
   },
 } as any);
 
@@ -147,19 +235,55 @@ const emailCapture = (): Block => ({
   },
 } as any);
 
-// Curated homepage sequence — competitor-grade flow:
-//   Hero → trust strip → new arrivals grid → brand story → bestsellers grid →
-//   promise grid → testimonials → FAQ → email capture.
+// Full-width auto-rotating hero slider (multi-image, video-capable). Slides use
+// the curated default imagery; vendors swap images / add video in the editor.
+const heroSlider = (): Block => ({
+  id: bid('slider'),
+  type: 'imageSlider',
+  settings: {
+    height: 'lg',
+    autoplay: true,
+    interval: 5,
+    slides: [
+      { kind: 'image', imageUrl: HERO_IMG,      videoUrl: '', alt: '', heading: 'New season sparkle',  subheading: 'Hand-finished brilliance, made for everyday.', ctaLabel: 'Shop new in',    ctaHref: '/products' },
+      { kind: 'image', imageUrl: CAT_NECKLACES, videoUrl: '', alt: '', heading: 'The necklace edit',   subheading: 'Layered looks, made to mix.',                  ctaLabel: 'Shop necklaces', ctaHref: '/products?category=necklaces' },
+      { kind: 'image', imageUrl: CAT_EARRINGS,  videoUrl: '', alt: '', heading: 'Everyday gold',       subheading: 'Lightweight pieces you never take off.',        ctaLabel: 'Shop earrings',  ctaHref: '/products?category=earrings' },
+    ],
+  },
+} as any);
+
+// Curated homepage sequence — competitor-grade flow modelled on top jewellery
+// storefronts (Mejuri, CaratLane, Tanishq, BlueNile):
+//   Hero → trust strip → shop-by-category tiles → new arrivals grid →
+//   brand story → on-model lifestyle strip → bestsellers grid → promise grid →
+//   editorial/journal cards → testimonials → FAQ → email capture.
 // Each preset overrides the hero copy only.
 const homepageBase = (headline: string, sub: string, cta: string): Block[] => [
   heroBanner(headline, sub, cta),
   trustStrip('canvas'),
+  categoryTiles(),
   productGrid('New arrivals', 8, 4),
   brandStory('Crafted in our atelier, made for everyday', 'Every piece begins as a sketch on paper, is shaped by hand by our karigars, and is finished one stone at a time. We make jewellery that feels personal — pieces meant to be worn, not stored away.'),
+  lifestyleStrip(),
   productGrid('Bestsellers', 8, 4),
   promiseGrid(),
+  journalCards(),
   testimonialsBlock(),
   homepageFaq(),
+  emailCapture(),
+];
+
+// J&Co-inspired "Luxe Minimal" homepage — leads with a full-width hero slider,
+// then a shop-by-category grid, product rails, trust strip, brand story, journal,
+// and newsletter. Clean white + gold, sans-serif, video-ready hero.
+const luxeHomepage = (): Block[] => [
+  heroSlider(),
+  categoryTiles(),
+  productGrid('New arrivals', 8, 4),
+  productGrid('Best sellers', 8, 4),
+  trustStrip('canvas'),
+  brandStory('Modern fine jewellery', 'Designed in-house and finished by hand, our pieces pair lab-grown brilliance with everyday wearability — luxury that fits real life, backed for the long run.'),
+  journalCards(),
   emailCapture(),
 ];
 
@@ -283,6 +407,7 @@ const classic: Preset = {
   theme: {
     colors:    { primary: '#B8860B', accent: '#8B5E3C', background: '#FFFDF8', text: '#1A1A1A', headerBg: '#FFFDF8', headerText: '#1A1A1A', footerBg: '#1A1A1A', footerText: '#F5EFE0' },
     typography:{ headingFont: 'serif', bodyFont: 'serif' },
+    animations: anim('fade-up', 'normal'),
   },
   pages: {
     HOMEPAGE: homepageBase(
@@ -302,6 +427,7 @@ const modern: Preset = {
   theme: {
     colors: { primary: '#F1641E', accent: '#0E0E0E', background: '#FFFFFF', text: '#0E0E0E', headerBg: '#FFFFFF', headerText: '#0E0E0E', footerBg: '#0E0E0E', footerText: '#FFFFFF' },
     typography: { headingFont: 'sans', bodyFont: 'sans' },
+    animations: anim('fade-up', 'fast'),
   },
   pages: {
     HOMEPAGE: homepageBase(
@@ -321,6 +447,7 @@ const minimal: Preset = {
   theme: {
     colors: { primary: '#111111', accent: '#666666', background: '#FFFFFF', text: '#111111', headerBg: '#FFFFFF', headerText: '#111111', footerBg: '#FFFFFF', footerText: '#111111' },
     typography: { headingFont: 'sans', bodyFont: 'sans' },
+    animations: anim('fade', 'slow', false),
   },
   pages: {
     HOMEPAGE: homepageBase(
@@ -340,6 +467,7 @@ const luxury: Preset = {
   theme: {
     colors: { primary: '#0E3B2E', accent: '#C9A95C', background: '#0E0E0E', text: '#F5EFE0', headerBg: '#0E0E0E', headerText: '#F5EFE0', footerBg: '#0E0E0E', footerText: '#F5EFE0' },
     typography: { headingFont: 'display', bodyFont: 'serif' },
+    animations: anim('fade', 'slow'),
   },
   pages: {
     HOMEPAGE: homepageBase(
@@ -359,6 +487,7 @@ const boutique: Preset = {
   theme: {
     colors: { primary: '#D87093', accent: '#9B5A75', background: '#FFF5F7', text: '#2A1A22', headerBg: '#FFF5F7', headerText: '#2A1A22', footerBg: '#9B5A75', footerText: '#FFF5F7' },
     typography: { headingFont: 'display', bodyFont: 'sans' },
+    animations: anim('zoom', 'normal'),
   },
   pages: {
     HOMEPAGE: homepageBase(
@@ -372,7 +501,56 @@ const boutique: Preset = {
   },
 };
 
-const presets: Record<PresetKey, Preset> = { classic, modern, minimal, luxury, boutique };
+const heirloom: Preset = {
+  meta: {
+    key: 'heirloom',
+    name: 'Heirloom',
+    description: 'Flagship luxury look — display serif, warm gold on ivory, editorial imagery and shop-by-category tiles.',
+    accent: '#A87C3D',
+    thumbnailUrl: IMG('1605100804763-247f67b3557e', 600),
+  },
+  themeColor: '#A87C3D',
+  theme: {
+    colors: { primary: '#A87C3D', accent: '#8B5E3C', background: '#FBF8F2', text: '#211B14', headerBg: '#FBF8F2', headerText: '#211B14', footerBg: '#211B14', footerText: '#F3E9D7' },
+    typography: { headingFont: 'display', bodyFont: 'serif' },
+    animations: anim('fade-up', 'normal'),
+  },
+  pages: {
+    HOMEPAGE: homepageBase(
+      'Heirlooms, in the making',
+      'Hand-finished gold and gemstones — pieces made to be worn now and passed on later.',
+      'Explore the collection',
+    ),
+    PDP: pdpDefault(),
+    CART: cartDefault(),
+    CHECKOUT: checkoutDefault(),
+  },
+};
+
+const luxe: Preset = {
+  meta: {
+    key: 'luxe',
+    name: 'Luxe Minimal',
+    description: 'Clean white + gold, modern sans-serif, video-ready hero slider and shop-by-category grid — inspired by contemporary fine-jewellery flagships.',
+    accent: '#B7975B',
+    thumbnailUrl: IMG('1599643478518-a784e5dc4c8f', 600),
+  },
+  themeColor: '#B7975B',
+  theme: {
+    colors: { primary: '#B7975B', accent: '#1A1A1A', background: '#FFFFFF', text: '#1A1A1A', headerBg: '#FFFFFF', headerText: '#1A1A1A', footerBg: '#111111', footerText: '#EDEDED' },
+    typography: { headingFont: 'sans', bodyFont: 'sans' },
+    header: { announcement: 'Free insured shipping on all orders over ₹2,000', showSearch: true, showMarketplaceLink: true, navLinks: [] },
+    animations: anim('fade-up', 'normal'),
+  },
+  pages: {
+    HOMEPAGE: luxeHomepage(),
+    PDP: pdpDefault(),
+    CART: cartDefault(),
+    CHECKOUT: checkoutDefault(),
+  },
+};
+
+const presets: Record<PresetKey, Preset> = { classic, modern, minimal, luxury, boutique, heirloom, luxe };
 
 export function listPresets(): PresetMeta[] {
   return (Object.keys(presets) as PresetKey[]).map((k) => presets[k].meta);

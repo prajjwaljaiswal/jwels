@@ -21,6 +21,11 @@ html, body {
   color: var(--color-ink-900);
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Prevent any full-bleed section from causing horizontal scroll that pushes the
+     sticky header's right-hand icons off-screen on mobile. `clip` (not `hidden`)
+     keeps position: sticky working. */
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 html { scroll-behavior: smooth; }
@@ -75,7 +80,8 @@ html { scroll-behavior: smooth; }
 [data-reveal] {
   opacity: 0;
   transform: translate3d(0, 28px, 0);
-  transition: opacity 900ms cubic-bezier(.2,.7,.2,1), transform 900ms cubic-bezier(.2,.7,.2,1);
+  transition: opacity var(--reveal-duration, 900ms) cubic-bezier(.2,.7,.2,1),
+              transform var(--reveal-duration, 900ms) cubic-bezier(.2,.7,.2,1);
   will-change: opacity, transform;
 }
 [data-reveal].is-visible {
@@ -85,9 +91,20 @@ html { scroll-behavior: smooth; }
 [data-reveal="left"]  { transform: translate3d(-32px, 0, 0); }
 [data-reveal="right"] { transform: translate3d(32px, 0, 0); }
 [data-reveal="zoom"]  { transform: scale(0.94); }
+[data-reveal="fade"]  { transform: none; }                 /* opacity-only fade */
 [data-reveal="left"].is-visible,
 [data-reveal="right"].is-visible { transform: translate3d(0, 0, 0); }
 [data-reveal="zoom"].is-visible  { transform: scale(1); }
+
+/* Vendor "hover effects" toggle — gentle image zoom on product / category cards. */
+.store-anim-hover a img,
+.store-anim-hover button img {
+  transition: transform 500ms cubic-bezier(.2,.7,.2,1);
+}
+.store-anim-hover a:hover img,
+.store-anim-hover button:hover img {
+  transform: scale(1.05);
+}
 
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }

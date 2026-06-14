@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { useVendor } from '@/lib/vendor-context';
+import { useVendor, useStoreReveal } from '@/lib/vendor-context';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import VendorProductDetailRoute from '../products/[id]/ProductDetailClient';
 import type { Block } from '@/components/blocks/types';
@@ -18,6 +18,7 @@ interface PublishedPage {
 export default function PageRenderer() {
   const { pageSlug } = useParams<{ pageSlug: string }>();
   const { vendor } = useVendor();
+  const reveal = useStoreReveal();
   const [page, setPage] = useState<PublishedPage | null>(null);
   const [isProduct, setIsProduct] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -50,5 +51,5 @@ export default function PageRenderer() {
 
   if (!page) return <div className="px-6 py-20 text-center text-ink-500">Loading…</div>;
 
-  return <BlockRenderer blocks={Array.isArray(page.blocks) ? page.blocks : []} ctx={{ scope: 'vendor', vendorId: vendor.id }} />;
+  return <BlockRenderer blocks={Array.isArray(page.blocks) ? page.blocks : []} ctx={{ scope: 'vendor', vendorId: vendor.id }} reveal={reveal} />;
 }

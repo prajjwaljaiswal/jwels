@@ -59,8 +59,12 @@ const imageWithTextBlock = z.object({
   id,
   type: z.literal('imageWithText'),
   settings: z.object({
-    imageUrl: optionalUrl.default(''),
+    mediaKind: z.enum(['image', 'video']).default('image'),
+    imageUrl: optionalUrl.default(''),   // image, or poster for a video
+    videoUrl: optionalUrl.default(''),   // mp4/webm URL when mediaKind = video
     imagePosition: z.enum(['left', 'right']).default('left'),
+    width: z.enum(['contained', 'full']).default('contained'),
+
     heading: shortText.optional().default(''),
     body: longText.optional().default(''),
     ctaLabel: z.string().max(40).optional().default(''),
@@ -189,6 +193,26 @@ const imageStripBlock = z.object({
       alt: z.string().max(120).optional().default(''),
       href: z.string().max(2000).optional().default(''),
     })).min(1).max(6).default([]),
+  }),
+});
+
+const imageSliderBlock = z.object({
+  id,
+  type: z.literal('imageSlider'),
+  settings: z.object({
+    height:   z.enum(['sm', 'md', 'lg']).default('md'),
+    autoplay: z.boolean().default(true),
+    interval: z.number().int().min(2).max(15).default(5), // seconds between slides
+    slides: z.array(z.object({
+      kind:       z.enum(['image', 'video']).default('image'),
+      imageUrl:   optionalUrl.default(''),  // image slide, or poster for a video slide
+      videoUrl:   optionalUrl.default(''),  // mp4/webm URL for video slides
+      alt:        z.string().max(120).optional().default(''),
+      heading:    z.string().max(120).optional().default(''),
+      subheading: z.string().max(200).optional().default(''),
+      ctaLabel:   z.string().max(40).optional().default(''),
+      ctaHref:    z.string().max(2000).optional().default(''),
+    })).max(8).default([]),
   }),
 });
 
@@ -438,6 +462,7 @@ const BlockUnion = z.discriminatedUnion('type', [
   editorialCardsBlock,
   iconGridBlock,
   imageStripBlock,
+  imageSliderBlock,
   emailCaptureBlock,
   pdpGalleryBlock,
   pdpSummaryBlock,
@@ -477,7 +502,7 @@ export type BlockType = Block['type'];
 
 export const BLOCK_TYPES: BlockType[] = [
   'hero','productGrid','featuredSection','richText','imageWithText','testimonials','faq','videoEmbed',
-  'featureStrip','categoryTiles','editorialCards','iconGrid','imageStrip','emailCapture',
+  'featureStrip','categoryTiles','editorialCards','iconGrid','imageStrip','imageSlider','emailCapture',
   'pdpGallery','pdpSummary','pdpVariants','pdpQuantityCart','pdpAttributes','pdpDescription',
   'pdpPersonalization','pdpReviews','pdpRelatedProducts','pdpTrustStrip','pdpShippingEstimator',
   'cartLineItems','cartSummary','cartUpsell','cartTrustStrip','cartAnnouncement',
@@ -503,6 +528,7 @@ export const BLOCK_ALLOWED_KINDS: Record<BlockType, PageKind[]> = {
   editorialCards:   ['HOMEPAGE','CUSTOM'],
   iconGrid:         ['HOMEPAGE','CUSTOM'],
   imageStrip:       ['HOMEPAGE','CUSTOM'],
+  imageSlider:      ['HOMEPAGE','CUSTOM'],
   emailCapture:     ['HOMEPAGE','CUSTOM','CART'],
   pdpGallery:           ['PDP'],
   pdpSummary:           ['PDP'],

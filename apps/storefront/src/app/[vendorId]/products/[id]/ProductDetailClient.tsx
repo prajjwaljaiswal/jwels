@@ -13,7 +13,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { addToCartWithVendorGuard } from '@/lib/cart';
-import { useVendor } from '@/lib/vendor-context';
+import { useVendor, useStoreReveal } from '@/lib/vendor-context';
 import { BlockRenderer } from '@/components/blocks/BlockRenderer';
 import { PdpProvider, type PdpProduct, type PdpReviewsData } from '@/components/blocks/pdp/PdpContext';
 import { LegacyVendorProductDetailPage } from './LegacyPdpLayout';
@@ -68,6 +68,7 @@ function BlockRenderedPdp({
 }) {
   const router = useRouter();
   const { vendor, theme, themeConfig, storeKey } = useVendor();
+  const reveal = useStoreReveal();
   const [product, setProduct] = useState<PdpProduct | null>(null);
   const [reviewsData, setReviewsData] = useState<PdpReviewsData | null>(null);
   const [canReview, setCanReview] = useState(false);
@@ -184,7 +185,9 @@ function BlockRenderedPdp({
 
         {wideBlocks.length > 0 && (
           <div className="mt-10">
-            <BlockRenderer blocks={wideBlocks} ctx={ctx} />
+            {/* Reveal the below-the-fold sections (reviews, related, FAQ); the
+                gallery + buy box above stay instant so the product is never hidden. */}
+            <BlockRenderer blocks={wideBlocks} ctx={ctx} reveal={reveal} />
           </div>
         )}
       </div>

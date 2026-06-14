@@ -1,7 +1,7 @@
 'use client';
 import { createElement, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 
-type Direction = 'up' | 'left' | 'right' | 'zoom';
+type Direction = 'up' | 'left' | 'right' | 'zoom' | 'fade';
 
 export function Reveal({
   children,

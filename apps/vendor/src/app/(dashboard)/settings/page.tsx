@@ -22,6 +22,8 @@ interface VendorProfile {
   address: string | null;
   themeColor: string | null;
   customDomain: string | null;
+  shopLogoUrl: string | null;
+  theme: any | null;
   businessType: string | null;
   legalName: string | null;
   panNumber: string | null;
@@ -301,8 +303,17 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
     address:      vendor.address ?? '',
     themeColor:   vendor.themeColor ?? '#4F46E5',
     customDomain: vendor.customDomain ?? '',
+    logoHeight:   String(vendor.theme?.header?.logoHeight ?? 48),
+    logoMaxWidth: String(vendor.theme?.header?.logoMaxWidth ?? 200),
+    animEnabled:  String(vendor.theme?.animations?.enabled ?? true),
+    animStyle:    vendor.theme?.animations?.style ?? 'fade-up',
+    animSpeed:    vendor.theme?.animations?.speed ?? 'normal',
+    animStagger:  String(vendor.theme?.animations?.stagger ?? true),
+    animHover:    String(vendor.theme?.animations?.hover ?? true),
   });
   const [saving, setSaving] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
 
   function patch(k: keyof typeof form, v: string) {
     setForm((p) => ({ ...p, [k]: v }));
@@ -313,19 +324,42 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
     if (form.shopName.trim().length < 2) return toast.error('Shop name must be at least 2 characters');
     setSaving(true);
     try {
-      await api('/api/vendors/me/settings', {
-        method: 'PATCH',
-        body: JSON.stringify({
-          shopName:     form.shopName.trim(),
-          slug:         form.slug.trim() || undefined,
-          tagline:      form.tagline.trim() || undefined,
-          description:  form.description.trim() || undefined,
-          address:      form.address.trim() || undefined,
-          themeColor:   form.themeColor || undefined,
-          customDomain: form.customDomain.trim() || undefined,
-        }),
-      });
+      // Preserve the rest of the theme; only override logo sizing here. The
+      // favicon URL is set server-side from the uploaded file.
+      const baseTheme = (vendor.theme ?? {}) as Record<string, any>;
+      const theme = {
+        ...baseTheme,
+        header: {
+          ...(baseTheme.header ?? {}),
+          logoHeight:   Number(form.logoHeight) || 48,
+          logoMaxWidth: Number(form.logoMaxWidth) || 200,
+        },
+        animations: {
+          ...(baseTheme.animations ?? {}),
+          enabled: form.animEnabled === 'true',
+          style:   form.animStyle,
+          speed:   form.animSpeed,
+          stagger: form.animStagger === 'true',
+          hover:   form.animHover === 'true',
+        },
+      };
+
+      const fd = new FormData();
+      fd.append('shopName', form.shopName.trim());
+      if (form.slug.trim())         fd.append('slug', form.slug.trim());
+      if (form.tagline.trim())      fd.append('tagline', form.tagline.trim());
+      if (form.description.trim())  fd.append('description', form.description.trim());
+      if (form.address.trim())      fd.append('address', form.address.trim());
+      if (form.themeColor)          fd.append('themeColor', form.themeColor);
+      if (form.customDomain.trim()) fd.append('customDomain', form.customDomain.trim());
+      fd.append('theme', JSON.stringify(theme));
+      if (logoFile)    fd.append('logo', logoFile);
+      if (faviconFile) fd.append('favicon', faviconFile);
+
+      await api('/api/vendors/me/settings', { method: 'PATCH', body: fd });
       toast.success('Shop profile saved');
+      setLogoFile(null);
+      setFaviconFile(null);
       onSaved();
     } finally {
       setSaving(false);
@@ -381,6 +415,101 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
               placeholder="shop.yourbrand.com"
               onChange={(e) => patch('customDomain', e.target.value.toLowerCase())} />
           </Field>
+        </div>
+
+        {/* ── Logo & favicon ──────────────────────────────────────────── */}
+        <div className="border-t border-line pt-4 mt-2">
+          <h3 className="font-semibold text-ink-900 mb-1">Logo &amp; favicon</h3>
+          <p className="text-xs text-ink-500 mb-4">Your logo shows in the storefront header (no frame — exactly as uploaded). The favicon is the small icon in the browser tab.</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Store logo" hint="PNG/SVG with transparent background works best.">
+              <div className="flex items-center gap-3">
+                {(logoFile || vendor.shopLogoUrl) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={logoFile ? URL.createObjectURL(logoFile) : vendor.shopLogoUrl!}
+                    alt="Logo preview"
+                    className="h-12 w-auto max-w-[120px] object-contain border border-line rounded"
+                  />
+                )}
+                <input type="file" accept="image/*" className="text-sm"
+                  onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
+              </div>
+            </Field>
+
+            <Field label="Favicon" hint="Square image (e.g. 64×64 or 512×512). Shown in the browser tab.">
+              <div className="flex items-center gap-3">
+                {(faviconFile || vendor.theme?.faviconUrl) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={faviconFile ? URL.createObjectURL(faviconFile) : vendor.theme.faviconUrl}
+                    alt="Favicon preview"
+                    className="h-10 w-10 object-contain border border-line rounded"
+                  />
+                )}
+                <input type="file" accept="image/*" className="text-sm"
+                  onChange={(e) => setFaviconFile(e.target.files?.[0] ?? null)} />
+              </div>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <Field label="Logo height (px)" hint="How tall the logo renders in the header. 24–120 is typical.">
+              <input type="number" min={16} max={200} className="input-field" value={form.logoHeight}
+                onChange={(e) => patch('logoHeight', e.target.value)} />
+            </Field>
+            <Field label="Logo max width (px)" hint="Caps the logo width so wide logos don't overflow. Width stays auto.">
+              <input type="number" min={40} max={600} className="input-field" value={form.logoMaxWidth}
+                onChange={(e) => patch('logoMaxWidth', e.target.value)} />
+            </Field>
+          </div>
+        </div>
+
+        {/* ── Animations ──────────────────────────────────────────────── */}
+        <div className="border-t border-line pt-4 mt-2">
+          <h3 className="font-semibold text-ink-900 mb-1">Animations</h3>
+          <p className="text-xs text-ink-500 mb-4">Controls how sections animate into view on your storefront. Respects “reduced motion” device settings.</p>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Scroll animations">
+              <select className="input-field" value={form.animEnabled} onChange={(e) => patch('animEnabled', e.target.value)}>
+                <option value="true">On</option>
+                <option value="false">Off</option>
+              </select>
+            </Field>
+            <Field label="Hover zoom (cards)">
+              <select className="input-field" value={form.animHover} onChange={(e) => patch('animHover', e.target.value)}>
+                <option value="true">On</option>
+                <option value="false">Off</option>
+              </select>
+            </Field>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <Field label="Style">
+              <select className="input-field" value={form.animStyle} onChange={(e) => patch('animStyle', e.target.value)} disabled={form.animEnabled !== 'true'}>
+                <option value="fade">Fade</option>
+                <option value="fade-up">Fade up</option>
+                <option value="left">Slide left</option>
+                <option value="right">Slide right</option>
+                <option value="zoom">Zoom</option>
+              </select>
+            </Field>
+            <Field label="Speed">
+              <select className="input-field" value={form.animSpeed} onChange={(e) => patch('animSpeed', e.target.value)} disabled={form.animEnabled !== 'true'}>
+                <option value="slow">Slow</option>
+                <option value="normal">Normal</option>
+                <option value="fast">Fast</option>
+              </select>
+            </Field>
+            <Field label="Stagger sections">
+              <select className="input-field" value={form.animStagger} onChange={(e) => patch('animStagger', e.target.value)} disabled={form.animEnabled !== 'true'}>
+                <option value="true">On</option>
+                <option value="false">Off</option>
+              </select>
+            </Field>
+          </div>
         </div>
 
         <div className="pt-1">

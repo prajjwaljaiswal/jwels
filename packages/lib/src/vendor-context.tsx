@@ -28,6 +28,8 @@ export interface VendorTheme {
     announcement: string;
     showSearch: boolean;
     showMarketplaceLink: boolean;
+    logoHeight?: number;     // logo render height in px (defaults to 48)
+    logoMaxWidth?: number;   // optional max-width cap in px (logo width stays auto)
     navLinks: NavLink[];
   };
   footer: {
@@ -37,6 +39,14 @@ export interface VendorTheme {
     contactEmail: string;
     contactPhone: string;
     copyright: string;
+  };
+  faviconUrl?: string;      // vendor-uploaded favicon (empty/undefined = browser default)
+  animations?: {
+    enabled: boolean;       // scroll-reveal sections as they enter the viewport
+    style: 'fade' | 'fade-up' | 'left' | 'right' | 'zoom';
+    speed: 'slow' | 'normal' | 'fast';
+    stagger: boolean;       // stagger the reveal of consecutive sections
+    hover: boolean;         // gentle image zoom on hover (product / category cards)
   };
 }
 
@@ -76,6 +86,8 @@ export function defaultTheme(primary = '#F1641E'): VendorTheme {
       announcement: '',
       showSearch: false,
       showMarketplaceLink: true,
+      logoHeight: 48,
+      logoMaxWidth: 200,
       navLinks: [],
     },
     footer: {
@@ -85,6 +97,14 @@ export function defaultTheme(primary = '#F1641E'): VendorTheme {
       contactEmail: '',
       contactPhone: '',
       copyright: '',
+    },
+    faviconUrl: '',
+    animations: {
+      enabled: true,
+      style: 'fade-up',
+      speed: 'normal',
+      stagger: true,
+      hover: true,
     },
   };
 }
@@ -97,6 +117,8 @@ export function mergeTheme(primary: string, partial?: Partial<VendorTheme> | nul
     typography: { ...base.typography, ...(partial.typography ?? {}) },
     header:     { ...base.header,     ...(partial.header     ?? {}) },
     footer:     { ...base.footer,     ...(partial.footer     ?? {}) },
+    faviconUrl: partial.faviconUrl ?? base.faviconUrl,
+    animations: { ...base.animations!, ...(partial.animations ?? {}) },
   };
 }
 
@@ -117,6 +139,23 @@ export function useVendor() {
   const ctx = useContext(VendorContext);
   if (!ctx) throw new Error('useVendor must be used within VendorProvider');
   return ctx;
+}
+
+export type StoreReveal = { direction: 'up' | 'left' | 'right' | 'zoom' | 'fade'; stagger: boolean };
+
+const REVEAL_STYLE_TO_DIR: Record<string, StoreReveal['direction']> = {
+  'fade': 'fade', 'fade-up': 'up', 'left': 'left', 'right': 'right', 'zoom': 'zoom',
+};
+
+/**
+ * Resolves the vendor's animation settings into a reveal config for BlockRenderer,
+ * or null when animations are disabled. Shared by the homepage, PDP, and custom pages.
+ */
+export function useStoreReveal(): StoreReveal | null {
+  const { themeConfig } = useVendor();
+  const a = themeConfig.animations;
+  if (!a?.enabled) return null;
+  return { direction: REVEAL_STYLE_TO_DIR[a.style] ?? 'up', stagger: a.stagger };
 }
 
 export const FONT_STACKS: Record<string, string> = {

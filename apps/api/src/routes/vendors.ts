@@ -12,7 +12,7 @@ import { SYSTEM_PAGE_SLUGS } from '../lib/blockSchemas';
 
 const router = Router();
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 const onboardSchema = z.object({
   shopName: z.string().min(2),
@@ -42,6 +42,8 @@ const themeSchema = z.object({
     announcement: z.string().max(200).optional(),
     showSearch:   z.boolean().optional(),
     showMarketplaceLink: z.boolean().optional(),
+    logoHeight:   z.number().int().min(16).max(200).optional(),   // logo render height in px
+    logoMaxWidth: z.number().int().min(40).max(600).optional(),   // optional max-width cap in px
     navLinks: z.array(z.object({
       label: z.string().min(1).max(40),
       href:  z.string().min(1).max(300),
@@ -63,6 +65,14 @@ const themeSchema = z.object({
     contactEmail: z.string().email().optional().or(z.literal('')),
     contactPhone: z.string().max(40).optional(),
     copyright:    z.string().max(200).optional(),
+  }).partial().optional(),
+  faviconUrl: z.string().url().max(2000).optional().or(z.literal('')), // vendor-uploaded favicon
+  animations: z.object({
+    enabled: z.boolean().optional(),
+    style:   z.enum(['fade', 'fade-up', 'left', 'right', 'zoom']).optional(),
+    speed:   z.enum(['slow', 'normal', 'fast']).optional(),
+    stagger: z.boolean().optional(),
+    hover:   z.boolean().optional(),
   }).partial().optional(),
 }).strict();
 
@@ -164,7 +174,7 @@ router.get('/me/onboarding', requireAuth, requireRole(Role.VENDOR), async (req, 
   });
 });
 
-const stepUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const stepUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 // PATCH /onboard/step/:step — partial save per step.
 router.patch(
@@ -278,7 +288,7 @@ router.patch(
   '/me/settings',
   requireAuth,
   requireRole(Role.VENDOR),
-  upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'banners', maxCount: 5 }]),
+  upload.fields([{ name: 'logo', maxCount: 1 }, { name: 'banners', maxCount: 5 }, { name: 'favicon', maxCount: 1 }]),
   async (req, res, next) => {
     try {
       const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
@@ -305,6 +315,15 @@ router.patch(
 
       if (files?.logo?.[0]) {
         updates.shopLogoUrl = await uploadBuffer(files.logo[0].buffer, 'logos');
+      }
+
+      // Favicon: upload the file and merge its URL into the theme JSON. Uses the
+      // client-sent theme (if any) as the base, else the vendor's existing theme,
+      // so a favicon upload never clobbers other theme settings.
+      if (files?.favicon?.[0]) {
+        const faviconUrl = await uploadBuffer(files.favicon[0].buffer, 'favicons');
+        const baseTheme = (updates.theme ?? (vendor.theme as any) ?? {}) as Record<string, any>;
+        updates.theme = { ...baseTheme, faviconUrl };
       }
 
       // keepBannerUrls: existing URLs the client wants to retain (JSON array string)

@@ -9,7 +9,7 @@ cloudinary.config({
 export function uploadBuffer(
   buffer: Buffer,
   folder = 'products',
-  resourceType: 'image' | 'video' = 'image'
+  resourceType: 'image' | 'video' | 'auto' = 'image'
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     cloudinary.uploader
@@ -36,7 +36,7 @@ export interface UploadResult {
 export function uploadBufferFull(
   buffer: Buffer,
   folder = 'assets',
-  resourceType: 'image' | 'video' = 'image'
+  resourceType: 'image' | 'video' | 'auto' = 'image'
 ): Promise<UploadResult> {
   return new Promise((resolve, reject) => {
     cloudinary.uploader

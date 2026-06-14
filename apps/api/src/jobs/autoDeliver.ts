@@ -1,5 +1,6 @@
 import { OrderStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { isDbConnectionError } from '../lib/prisma-errors';
 
 const AUTO_DELIVER_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const SCAN_INTERVAL_MS = 60 * 60 * 1000;               // every 1 hour
@@ -41,7 +42,13 @@ export function startAutoDeliverJob() {
   const run = () => {
     autoDeliverShippedItems()
       .then((n) => { if (n > 0) console.log(`[auto-deliver] marked ${n} item(s) as delivered`); })
-      .catch((e) => console.error('[auto-deliver] failed:', e));
+      .catch((e) => {
+        if (isDbConnectionError(e)) {
+          console.warn('[auto-deliver] skipped — database unreachable, will retry next tick');
+        } else {
+          console.error('[auto-deliver] failed:', e);
+        }
+      });
   };
 
   setTimeout(run, 60_000);

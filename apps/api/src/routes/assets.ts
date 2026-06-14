@@ -15,7 +15,10 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { uploadBufferFull, deleteByPublicId } from '../lib/cloudinary';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv|avi|mkv)$/i;
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp|avif|svg|bmp|tiff?)$/i;
 
 const MAX_PAGE_SIZE = 60;
 
@@ -63,8 +66,11 @@ router.post(
       const file = req.file;
       if (!file) return res.status(400).json({ error: 'No file uploaded' });
 
-      const isVideo = file.mimetype.startsWith('video/');
-      const isImage = file.mimetype.startsWith('image/');
+      // Detect by mime OR extension — browsers sometimes report video files as
+      // application/octet-stream, which would otherwise be treated as an image.
+      const name = file.originalname || '';
+      const isVideo = file.mimetype.startsWith('video/') || VIDEO_EXT.test(name);
+      const isImage = file.mimetype.startsWith('image/') || IMAGE_EXT.test(name);
       if (!isImage && !isVideo) {
         return res.status(400).json({ error: 'Only image / video uploads are accepted' });
       }
@@ -72,14 +78,17 @@ router.post(
       const alt = typeof req.body?.alt === 'string' ? req.body.alt.slice(0, 200) : null;
       const folder = `vendor-assets/${vendor.id}`;
 
-      const result = await uploadBufferFull(file.buffer, folder, isVideo ? 'video' : 'image');
+      // 'auto' lets Cloudinary pick the right pipeline even when the mime is
+      // ambiguous; we read the true type back from result.resourceType.
+      const result = await uploadBufferFull(file.buffer, folder, isVideo ? 'video' : 'auto');
+      const kind = result.resourceType === 'video' ? 'video' : result.resourceType === 'raw' ? 'raw' : 'image';
 
       const row = await prisma.vendorAsset.create({
         data: {
           vendorId: vendor.id,
           url: result.url,
           publicId: result.publicId,
-          kind: isVideo ? 'video' : 'image',
+          kind,
           alt,
           width: result.width ?? null,
           height: result.height ?? null,

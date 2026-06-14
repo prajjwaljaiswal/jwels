@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { isDbConnectionError } from '../lib/prisma-errors';
 
 const ABANDON_AFTER_MS = 60 * 60 * 1000; // 1 hour
 const SCAN_INTERVAL_MS = 15 * 60 * 1000; // every 15 minutes
@@ -33,7 +34,13 @@ export function startAbandonedCartJob() {
   const run = () => {
     markAbandonedCarts()
       .then((n) => { if (n > 0) console.log(`[abandoned-cart] marked ${n} cart(s)`); })
-      .catch((e) => console.error('[abandoned-cart] failed:', e));
+      .catch((e) => {
+        if (isDbConnectionError(e)) {
+          console.warn('[abandoned-cart] skipped — database unreachable, will retry next tick');
+        } else {
+          console.error('[abandoned-cart] failed:', e);
+        }
+      });
   };
 
   // Run once shortly after boot, then on interval.

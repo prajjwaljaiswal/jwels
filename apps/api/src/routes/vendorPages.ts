@@ -19,7 +19,7 @@ import { aiAvailable, generatePageBlocks, generateTheme } from '../lib/ai';
 import { defaultBlocksFor, SYSTEM_TITLES, type SystemPageKind } from '../lib/themePresets';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 const MAX_VERSIONS_PER_PAGE = 5;
 
@@ -344,7 +344,10 @@ router.post(
       if (!owned.ok) return res.status(owned.code).json({ error: owned.error });
       const file = req.file;
       if (!file) return res.status(400).json({ error: 'No file uploaded' });
-      const url = await uploadBuffer(file.buffer, 'page-blocks');
+      // Let Cloudinary auto-detect image vs video — browsers sometimes report a
+      // video's mime as application/octet-stream, which would otherwise be sent as
+      // an image and rejected with "Invalid image file".
+      const url = await uploadBuffer(file.buffer, 'page-blocks', 'auto');
       res.json({ url });
     } catch (e) { next(e); }
   }
