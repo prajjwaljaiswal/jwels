@@ -5,6 +5,47 @@ import { api } from '@/lib/api';
 import { PageHeader, Card } from '@/components/dashboard/DashboardShell';
 import { useCurrency, CURRENCIES, type CurrencyCode } from '@/lib/currency';
 
+/**
+ * Downscale/re-encode an image in the browser before upload so it stays small.
+ * A multi-MB logo otherwise exceeds the reverse-proxy body-size limit and is
+ * rejected with a CORS-less 413 that the browser surfaces as a "Network error".
+ * Keeps aspect ratio and transparency (re-encodes to PNG). Falls back to the
+ * original file on any failure or for vector/animated formats.
+ */
+async function downscaleImage(file: File, maxDim: number): Promise<File> {
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif') return file;
+  try {
+    const dataUrl: string = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result as string);
+      fr.onerror = () => reject(fr.error);
+      fr.readAsDataURL(file);
+    });
+    const img: HTMLImageElement = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Could not read image'));
+      i.src = dataUrl;
+    });
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    // Already small enough in both dimensions and bytes — keep as-is.
+    if (scale >= 1 && file.size <= 600 * 1024) return file;
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, w, h);
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.png', { type: 'image/png' });
+  } catch {
+    return file;
+  }
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface Me {
@@ -434,7 +475,10 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
                   />
                 )}
                 <input type="file" accept="image/*" className="text-sm"
-                  onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    setLogoFile(f ? await downscaleImage(f, 512) : null);
+                  }} />
               </div>
             </Field>
 
@@ -449,7 +493,10 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
                   />
                 )}
                 <input type="file" accept="image/*" className="text-sm"
-                  onChange={(e) => setFaviconFile(e.target.files?.[0] ?? null)} />
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    setFaviconFile(f ? await downscaleImage(f, 256) : null);
+                  }} />
               </div>
             </Field>
           </div>
