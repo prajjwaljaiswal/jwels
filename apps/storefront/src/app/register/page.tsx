@@ -32,13 +32,16 @@ function mergeTheme(vendor: VendorBrand): VendorTheme {
 function RegisterInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '';
-
-  const vendorKey = next.startsWith('/') ? next.split('/')[1] : '';
+  const rawNext = searchParams.get('next') || '';
+  // Ignore a ?next that points back at an auth route (prevents a post-auth loop).
+  const AUTH_ROUTE = /^\/(login|register|forgot-password|reset-password)(\/|$|\?)/;
+  const next = rawNext.startsWith('/') && !AUTH_ROUTE.test(rawNext) ? rawNext : '';
 
   const [vendor, setVendor] = useState<VendorBrand | null>(null);
+  const [vendorKey, setVendorKey] = useState(next.startsWith('/') ? next.split('/')[1] : '');
+  const [storeHome, setStoreHome] = useState('/');
   const [themeConfig, setThemeConfig] = useState<VendorTheme>(defaultTheme());
-  const [themeReady, setThemeReady] = useState(!vendorKey);
+  const [themeReady, setThemeReady] = useState(false);
 
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' });
   const [showPass, setShowPass] = useState(false);
@@ -46,19 +49,42 @@ function RegisterInner() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!vendorKey) return;
-    api<{ vendor: VendorBrand }>(`/api/vendors/${vendorKey}`, { auth: false, silent: true })
-      .then(({ vendor }) => {
-        setVendor(vendor);
-        setThemeConfig(mergeTheme(vendor));
-      })
-      .catch(() => {})
-      .finally(() => setThemeReady(true));
-  }, [vendorKey]);
+    let cancelled = false;
+    const pathKey = next.startsWith('/') ? next.split('/')[1] : '';
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost';
+    // On a custom vendor domain the ?next path is slug-less — resolve by domain.
+    const isCustomDomain =
+      !!host && host !== appDomain && host !== 'localhost' && !host.endsWith('.localhost');
+
+    (async () => {
+      try {
+        let v: VendorBrand | null = null;
+        if (isCustomDomain) {
+          v = await api<VendorBrand>(`/api/vendors/by-domain/${encodeURIComponent(host)}`, { auth: false, silent: true });
+        } else if (pathKey) {
+          v = (await api<{ vendor: VendorBrand }>(`/api/vendors/${pathKey}`, { auth: false, silent: true })).vendor;
+        }
+        if (v && !cancelled) {
+          const key = v.slug || v.id;
+          setVendor(v);
+          setThemeConfig(mergeTheme(v));
+          setVendorKey(key);
+          setStoreHome(isCustomDomain ? '/' : `/${key}`);
+        }
+      } catch {
+        // Unresolved — fall back to the default theme.
+      } finally {
+        if (!cancelled) setThemeReady(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [next]);
 
   function routeAfterRegister() {
-    if (next && next.startsWith('/')) { router.push(next); return; }
-    router.push(vendorKey ? `/${vendorKey}` : '/');
+    if (next) { router.push(next); return; }
+    router.push(storeHome);
   }
 
   async function onSubmit(e: React.FormEvent) {

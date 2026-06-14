@@ -60,11 +60,11 @@ function ThemedTokensCss({ t }: { t: VendorTheme }) {
 function ForgotPasswordInner() {
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '';
-  const vendorKey = next.startsWith('/') ? next.split('/')[1] : '';
 
   const [vendor, setVendor] = useState<VendorBrand | null>(null);
+  const [vendorKey, setVendorKey] = useState(next.startsWith('/') ? next.split('/')[1] : '');
   const [themeConfig, setThemeConfig] = useState<VendorTheme>(defaultTheme());
-  const [themeReady, setThemeReady] = useState(!vendorKey);
+  const [themeReady, setThemeReady] = useState(false);
 
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -72,15 +72,36 @@ function ForgotPasswordInner() {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    if (!vendorKey) return;
-    api<{ vendor: VendorBrand }>(`/api/vendors/${vendorKey}`, { auth: false, silent: true })
-      .then(({ vendor }) => {
-        setVendor(vendor);
-        setThemeConfig(mergeTheme(vendor));
-      })
-      .catch(() => {})
-      .finally(() => setThemeReady(true));
-  }, [vendorKey]);
+    let cancelled = false;
+    const pathKey = next.startsWith('/') ? next.split('/')[1] : '';
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost';
+    // On a custom vendor domain the ?next path is slug-less — resolve by domain.
+    const isCustomDomain =
+      !!host && host !== appDomain && host !== 'localhost' && !host.endsWith('.localhost');
+
+    (async () => {
+      try {
+        let v: VendorBrand | null = null;
+        if (isCustomDomain) {
+          v = await api<VendorBrand>(`/api/vendors/by-domain/${encodeURIComponent(host)}`, { auth: false, silent: true });
+        } else if (pathKey) {
+          v = (await api<{ vendor: VendorBrand }>(`/api/vendors/${pathKey}`, { auth: false, silent: true })).vendor;
+        }
+        if (v && !cancelled) {
+          setVendor(v);
+          setThemeConfig(mergeTheme(v));
+          setVendorKey(v.slug || v.id);
+        }
+      } catch {
+        // Unresolved — fall back to the default theme.
+      } finally {
+        if (!cancelled) setThemeReady(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [next]);
 
   const t = themeConfig;
   const primary = t.colors.primary;

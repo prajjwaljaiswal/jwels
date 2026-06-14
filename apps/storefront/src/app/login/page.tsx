@@ -32,14 +32,19 @@ function mergeTheme(vendor: VendorBrand): VendorTheme {
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get('next') || '';
-
-  // Extract vendor slug from the ?next path (e.g. /my-shop/orders → my-shop)
-  const vendorKey = next.startsWith('/') ? next.split('/')[1] : '';
+  const rawNext = searchParams.get('next') || '';
+  // Ignore a ?next that points back at an auth route — prevents a sign-in loop
+  // (e.g. /login?next=%2Flogin redirecting to /login again after sign-in).
+  const AUTH_ROUTE = /^\/(login|register|forgot-password|reset-password)(\/|$|\?)/;
+  const next = rawNext.startsWith('/') && !AUTH_ROUTE.test(rawNext) ? rawNext : '';
 
   const [vendor, setVendor] = useState<VendorBrand | null>(null);
+  // Slug used by the header link + post-login fallback redirect. Seeded from the
+  // ?next path (path-based hosts) and overwritten once the vendor is resolved.
+  const [vendorKey, setVendorKey] = useState(next.startsWith('/') ? next.split('/')[1] : '');
+  const [storeHome, setStoreHome] = useState('/');
   const [themeConfig, setThemeConfig] = useState<VendorTheme>(defaultTheme());
-  const [themeReady, setThemeReady] = useState(!vendorKey);
+  const [themeReady, setThemeReady] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,21 +53,45 @@ function LoginInner() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!vendorKey) return;
-    api<{ vendor: VendorBrand }>(`/api/vendors/${vendorKey}`, { auth: false, silent: true })
-      .then(({ vendor }) => {
-        setVendor(vendor);
-        setThemeConfig(mergeTheme(vendor));
-      })
-      .catch(() => {})
-      .finally(() => setThemeReady(true));
-  }, [vendorKey]);
+    let cancelled = false;
+    const pathKey = next.startsWith('/') ? next.split('/')[1] : '';
+    const host = typeof window !== 'undefined' ? window.location.hostname : '';
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost';
+    // On a custom vendor domain the ?next path is slug-less, so resolve the
+    // vendor (for branding + the post-login home redirect) from the domain.
+    const isCustomDomain =
+      !!host && host !== appDomain && host !== 'localhost' && !host.endsWith('.localhost');
+
+    (async () => {
+      try {
+        let v: VendorBrand | null = null;
+        if (isCustomDomain) {
+          v = await api<VendorBrand>(`/api/vendors/by-domain/${encodeURIComponent(host)}`, { auth: false, silent: true });
+        } else if (pathKey) {
+          v = (await api<{ vendor: VendorBrand }>(`/api/vendors/${pathKey}`, { auth: false, silent: true })).vendor;
+        }
+        if (v && !cancelled) {
+          const key = v.slug || v.id;
+          setVendor(v);
+          setThemeConfig(mergeTheme(v));
+          setVendorKey(key);
+          setStoreHome(isCustomDomain ? '/' : `/${key}`);
+        }
+      } catch {
+        // Unresolved — fall back to the default theme.
+      } finally {
+        if (!cancelled) setThemeReady(true);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [next]);
 
   function routeAfterLogin(role: string) {
-    if (next && next.startsWith('/')) { router.push(next); return; }
+    if (next) { router.push(next); return; }
     if (role === 'ADMIN')  { window.location.href = process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3002/'; return; }
     if (role === 'VENDOR') { window.location.href = process.env.NEXT_PUBLIC_VENDOR_URL || 'http://localhost:3001/'; return; }
-    router.push(vendorKey ? `/${vendorKey}` : '/');
+    router.push(storeHome);
   }
 
   async function onSubmit(e: React.FormEvent) {
