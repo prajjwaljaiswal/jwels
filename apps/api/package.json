@@ -4,7 +4,8 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc --noCheck",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && tsc --noCheck",
     "start": "node dist/index.js",
     "prisma:migrate": "prisma db push",
     "prisma:studio": "prisma studio",

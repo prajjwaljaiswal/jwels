@@ -6,22 +6,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### From workspace root
 ```bash
-npm run dev:api       # Start backend (port 4000, hot reload via tsx watch)
-npm run dev:web       # Start customer storefront (port 3000)
-npm run dev:vendor    # Start vendor dashboard (port 3001)
-npm run dev:admin     # Start admin console (port 3002)
-npm run db:migrate    # Run Prisma migrations
-npm run db:studio     # Open Prisma Studio GUI (port 5555)
+npm run dev:api          # Start backend (port 4000, hot reload via tsx watch)
+npm run dev:web          # Start customer storefront (port 3000)
+npm run dev:vendor       # Start vendor dashboard (port 3001)
+npm run dev:admin        # Start admin console (port 3002)
+npm run dev:storefront   # Start per-vendor branded storefront (port 3003)
+npm run db:migrate       # Sync schema to DB — runs `prisma db push` (NOT migrate; no migration files)
+npm run db:studio        # Open Prisma Studio GUI (port 5555)
+npm run build:all        # Build all five apps in sequence
+```
+
+### Production (PM2)
+`ecosystem.config.js` runs all five apps as PM2 processes (`jewel-api`, `jewel-web`, `jewel-vendor`, `jewel-admin`, `jewel-storefront`). Build first (`npm run build:all`), then:
+```bash
+npm run pm2:start   # / pm2:stop / pm2:restart / pm2:logs / pm2:status
 ```
 
 ### Backend (apps/api)
 ```bash
-npm run build              # tsc → dist/
-npm run start              # node dist/index.js
-npm run prisma:seed        # Create default admin (admin@jewel.local / admin123)
+npm run build                      # tsc --noCheck → dist/ (type errors are NOT caught at build — run tsc separately to typecheck)
+npm run start                      # node dist/index.js
+npm run prisma:seed                # Create default admin (admin@jewel.local / admin123)
+npm run prisma:seed:jewellery-taxonomy   # Seed category tree / mega-menu / attributes (see other prisma:seed:* scripts)
+npm run gen:enc-key                # Generate a value for ENCRYPTION_KEY (required — boot asserts it is set)
+npm run algolia:reindex            # Rebuild the Algolia product index
 ```
 
-### Frontend apps (apps/web | apps/vendor | apps/admin)
+### Frontend apps (apps/web | apps/vendor | apps/admin | apps/storefront)
 ```bash
 npm run lint   # next lint
 npm run build  # next build
@@ -31,31 +42,40 @@ No test suite is configured.
 
 ## Architecture
 
-npm workspaces monorepo with four apps and two shared packages. All apps communicate with the single Express API over HTTP.
+npm workspaces monorepo with five apps and two shared packages. All apps communicate with the single Express API over HTTP.
 
 ```
 jewel-marketplace/
 ├── apps/
-│   ├── api/        Express + TypeScript backend (port 4000)
-│   ├── web/        Next.js 14 customer storefront (port 3000)
-│   ├── vendor/     Next.js 14 vendor dashboard (port 3001)
-│   └── admin/      Next.js 14 admin console (port 3002)
+│   ├── api/         Express + TypeScript backend (port 4000)
+│   ├── web/         Next.js 14 customer marketplace storefront (port 3000)
+│   ├── vendor/      Next.js 14 vendor dashboard (port 3001)
+│   ├── admin/       Next.js 14 admin console (port 3002)
+│   └── storefront/  Next.js 14 standalone per-vendor branded storefront (port 3003)
 └── packages/
-    ├── lib/        Shared utilities & Zustand stores (@jewel/lib)
-    └── ui/         Shared React components (@jewel/ui)
+    ├── lib/         Shared utilities & Zustand stores (@jewel/lib)
+    └── ui/          Shared React components (@jewel/ui)
 ```
+
+`web` is the aggregate marketplace (browse all vendors); `storefront` is the per-vendor branded shop — its routes are rooted at `[vendorId]` with their own cart/checkout/account/orders and page-builder-driven pages (`[vendorId]/[pageSlug]`), and search is powered by Algolia / react-instantsearch rather than the API.
 
 ### Backend (`apps/api`)
 
-Express REST API mounted at `/api/*`. Route files in `src/routes/` map to resources:
+Express REST API mounted at `/api/*` (route-to-mount mapping lives in `src/index.ts`). Notable route files in `src/routes/`:
 
-- `auth.ts` — register, login, `/me`
+- `auth.ts` — register, login, `/me`, password reset
 - `products.ts` — CRUD with Cloudinary image upload, public listing/search
 - `vendors.ts` — vendor profile creation and approval workflow
 - `orders.ts` — order creation, Razorpay payment webhook, status updates
-- `admin.ts` — vendor approval, payout calculation (gross − 10% commission)
+- `admin.ts` / `rbac.ts` — vendor approval, payout calc (gross − 10% commission), role/permission management
+- `cart.ts`, `wishlist.ts`, `addresses.ts` — server-side persistence synced from the frontend Zustand stores
+- `categories.ts`, `collections.ts`, `coupons.ts`, `reviews.ts`, `questions.ts` — catalog & merchandising
+- `vendorPages.ts` — page-builder pages; exports both the authed router and a `publicRouter` mounted at `/api/storefront-pages` for the storefront app
+- `shipping.ts`, `fulfillment.ts`, `payments.ts`, `assets.ts` (vendor media library, mounted under `/api/vendors`), `settings.ts`
 
-`src/middleware/auth.ts` provides JWT verification and role-based guards (CUSTOMER / VENDOR / ADMIN). `src/lib/` exports singletons for Prisma, Cloudinary, JWT helpers, and the Razorpay SDK.
+`src/middleware/auth.ts` provides JWT verification and role-based guards (CUSTOMER / VENDOR / ADMIN). `src/lib/` exports singletons and helpers: `prisma`, `cloudinary`, `jwt`, `razorpay`, plus `crypto.ts` (field-level encryption — `assertEncryptionKeyConfigured()` runs at boot and aborts if `ENCRYPTION_KEY` is unset), `algolia.ts` (search index sync), `ai.ts` (Anthropic SDK), `email.ts` (nodemailer), `audit.ts`, `coupon.ts`, `shipping.ts`, `vendor-slug.ts`, `themePresets.ts`, `blockSchemas.ts`.
+
+`src/jobs/` holds setInterval-based background jobs started in `index.ts` on listen: `abandonedCart.ts` and `autoDeliver.ts`.
 
 **Database:** PostgreSQL via Prisma 5. Schema at `apps/api/prisma/schema.prisma`. Key relationships: User → Vendor (optional, one-to-one) → Products; User → Orders → OrderItems → Product + Vendor. OrderItem has its own status field to support split-vendor shipping.
 
@@ -103,6 +123,6 @@ JWT issued on login, stored in localStorage by the frontend. The `api()` helper 
 
 ### Environment variables
 
-Backend (`apps/api/.env`): `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `CLOUDINARY_*`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `PLATFORM_COMMISSION_PERCENT` (default 10), `WEB_ORIGIN`.
+Backend (`apps/api/.env`): `DATABASE_URL`, `JWT_SECRET`, `JWT_EXPIRES_IN`, `ENCRYPTION_KEY` (required — generate via `npm run gen:enc-key`; the process refuses to boot without it), `CLOUDINARY_*`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `PLATFORM_COMMISSION_PERCENT` (default 10), `WEB_ORIGIN`, Algolia (`ALGOLIA_*`), Anthropic (`ANTHROPIC_API_KEY`), and SMTP/email settings for nodemailer.
 
-All frontend apps (`apps/*/env`): `NEXT_PUBLIC_API_URL` (points to backend, e.g. `http://localhost:4000`).
+All frontend apps (`apps/*/.env`): `NEXT_PUBLIC_API_URL` (points to backend, e.g. `http://localhost:4000`). The `storefront` app additionally needs the public Algolia keys (`NEXT_PUBLIC_ALGOLIA_*`) for client-side search.
