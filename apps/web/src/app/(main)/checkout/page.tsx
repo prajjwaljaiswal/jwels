@@ -9,6 +9,7 @@ import { useWishlist } from '@/lib/wishlist';
 import { api } from '@/lib/api';
 import { addressApi, type Address } from '@/lib/addresses';
 import { GuestCheckoutPanel } from '@/components/GuestCheckoutPanel';
+import { track } from '@/components/Analytics';
 import { CheckoutStep } from '@/components/checkout/CheckoutStep';
 
 declare global {
@@ -388,6 +389,17 @@ export default function CheckoutPage() {
         order_id: checkout.razorpayOrderId,
         name: 'Vrindaonline Marketplace',
         prefill: { name: addr.name, contact: addr.phone },
+        // Surface affordability options (EMI / no-cost EMI / Pay-Later) and UPI
+        // alongside the standard methods. These also require EMI/Pay-Later to be
+        // enabled on the Razorpay account and the order to meet amount minimums.
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+          emi: true,
+          paylater: true,
+        },
         handler: async (response: any) => {
           try {
             await api('/api/orders/verify-payment', {
@@ -399,6 +411,7 @@ export default function CheckoutPage() {
                 razorpaySignature: response.razorpay_signature,
               }),
             });
+            track('purchase', { transaction_id: checkout.orderId, value: checkout.amount / 100, currency: checkout.currency });
             toast.success('Payment successful — order confirmed!');
             clear();
             router.push('/orders');

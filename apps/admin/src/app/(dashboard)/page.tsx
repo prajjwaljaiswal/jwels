@@ -8,12 +8,18 @@ import { useCurrency, formatPrice } from '@/lib/currency';
 
 interface Vendor { id: string; shopName: string; status: string; createdAt: string; user: { name: string; email: string }; }
 interface PayoutRow { vendorId: string; shopName: string; payable: number; }
+interface Analytics {
+  gmv: number; orderCount: number; aov: number; commissionEarned: number;
+  conversion: number; refundRate: number; newVendors: number; newCustomers: number;
+  topVendors: { vendorId: string; shopName: string; revenue: number }[];
+}
 
 export default function AdminOverview() {
   const { code } = useCurrency();
   const [pending, setPending] = useState<Vendor[]>([]);
   const [approved, setApproved] = useState<Vendor[]>([]);
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,10 +27,12 @@ export default function AdminOverview() {
       api<Vendor[]>('/api/admin/vendors?status=PENDING').catch(() => []),
       api<Vendor[]>('/api/admin/vendors?status=APPROVED').catch(() => []),
       api<{ vendors: PayoutRow[] }>('/api/admin/payouts').catch(() => ({ vendors: [] as PayoutRow[] })),
-    ]).then(([p, a, payoutRes]) => {
+      api<Analytics>('/api/admin/analytics?days=30').catch(() => null),
+    ]).then(([p, a, payoutRes, an]) => {
       setPending(p);
       setApproved(a);
       setPayouts(payoutRes.vendors || []);
+      setAnalytics(an);
       setLoading(false);
     });
   }, []);
@@ -36,6 +44,7 @@ export default function AdminOverview() {
   }
 
   const totalPayable = payouts.reduce((s, p) => s + p.payable, 0);
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
   return (
     <div>
@@ -50,11 +59,18 @@ export default function AdminOverview() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <KpiCard label="Pending approvals" value={pending.length} hint="Vendors awaiting review" accent="warn" />
             <KpiCard label="Active vendors" value={approved.length} hint="Approved shops" accent="success" />
             <KpiCard label="Payouts due" value={formatPrice(totalPayable, code)} hint={`${payouts.length} vendors`} accent="brand" />
-            <KpiCard label="GMV (30d)" value="—" hint="Wire up analytics" />
+            <KpiCard label="GMV (30d)" value={analytics ? formatPrice(analytics.gmv, code) : '—'} hint={analytics ? `${analytics.orderCount} paid orders` : '—'} accent="brand" />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <KpiCard label="Commission earned (30d)" value={analytics ? formatPrice(analytics.commissionEarned, code) : '—'} hint="Platform revenue" accent="success" />
+            <KpiCard label="Avg order value" value={analytics ? formatPrice(analytics.aov, code) : '—'} hint="Per paid order" />
+            <KpiCard label="Refund rate (30d)" value={analytics ? pct(analytics.refundRate) : '—'} hint="Refunded vs paid" accent={analytics && analytics.refundRate > 0.1 ? 'warn' : undefined} />
+            <KpiCard label="New customers (30d)" value={analytics ? analytics.newCustomers : '—'} hint={analytics ? `${analytics.newVendors} new vendors` : '—'} />
           </div>
 
           <div className="grid lg:grid-cols-3 gap-6">

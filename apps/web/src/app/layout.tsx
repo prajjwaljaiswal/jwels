@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import { CartHydrator } from '@/components/CartHydrator';
+import { Analytics } from '@/components/Analytics';
 
 export const metadata: Metadata = {
   title: 'Vrindaonline — Handcrafted jewelry marketplace',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-canvas text-ink-900 antialiased">
+        <Analytics />
         <CartHydrator />
         {children}
         <Toaster

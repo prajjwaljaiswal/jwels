@@ -206,6 +206,11 @@ export function DetailsStep({ draft, setDraft }: StepProps) {
                         value={draft.certificateNumber} maxLength={80}
                         onChange={(e) => setDraft({ certificateNumber: e.target.value })} />
                     </Field>
+                    <Field label="BIS HUID" hint="6-character Hallmark Unique ID (buyers verify on the BIS Care app)">
+                      <input className="input-field" placeholder="e.g. AZ4D9K"
+                        value={draft.huid} maxLength={20}
+                        onChange={(e) => setDraft({ huid: e.target.value.toUpperCase() })} />
+                    </Field>
                   </div>
                 )}
               </div>

@@ -6,6 +6,7 @@ import { Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { requireAuth, loadPermissions } from '../middleware/auth';
+import { authLimiter, sensitiveAuthLimiter } from '../middleware/rateLimit';
 import { sendPasswordResetEmail } from '../lib/email';
 
 const router = Router();
@@ -18,7 +19,7 @@ const registerSchema = z.object({
   role: z.enum(['CUSTOMER', 'VENDOR']).default('CUSTOMER'),
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', sensitiveAuthLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.flatten() });
@@ -45,7 +46,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const { email, password } = parsed.data;
@@ -80,7 +81,7 @@ interface GoogleTokenInfo {
   error_description?: string;
 }
 
-router.post('/google', async (req, res) => {
+router.post('/google', authLimiter, async (req, res) => {
   const parsed = googleSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -160,7 +161,7 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(6),
 });
 
-router.post('/change-password', requireAuth, async (req, res) => {
+router.post('/change-password', sensitiveAuthLimiter, requireAuth, async (req, res) => {
   const parsed = changePasswordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const { currentPassword, newPassword } = parsed.data;
@@ -181,7 +182,7 @@ const forgotPasswordSchema = z.object({
   vendor: z.string().optional(),
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', sensitiveAuthLimiter, async (req, res) => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
@@ -216,7 +217,7 @@ const resetPasswordSchema = z.object({
   password: z.string().min(6),
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', sensitiveAuthLimiter, async (req, res) => {
   const parsed = resetPasswordSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 

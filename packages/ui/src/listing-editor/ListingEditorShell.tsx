@@ -59,6 +59,7 @@ export function ListingEditorShell({ productId }: ListingEditorShellProps = {}) 
             hallmarked: p.hallmarked ?? false,
             certifiedBy: p.certifiedBy ?? '',
             certificateNumber: p.certificateNumber ?? '',
+            huid: p.huid ?? '',
             hsnCode: p.hsnCode ?? '',
             gstRatePercent: p.gstRatePercent != null ? String(p.gstRatePercent) : '',
             countryOfOrigin: p.countryOfOrigin ?? 'IN',
@@ -202,6 +203,7 @@ export function ListingEditorShell({ productId }: ListingEditorShellProps = {}) 
       fd.append('hallmarked', String(draft.hallmarked));
       if (draft.certifiedBy)            fd.append('certifiedBy',       draft.certifiedBy);
       if (draft.certificateNumber.trim()) fd.append('certificateNumber', draft.certificateNumber.trim());
+      if (draft.huid.trim())            fd.append('huid',            draft.huid.trim());
       if (draft.hsnCode.trim())         fd.append('hsnCode',         draft.hsnCode.trim());
       if (draft.gstRatePercent)         fd.append('gstRatePercent',  draft.gstRatePercent);
       if (draft.countryOfOrigin.trim()) fd.append('countryOfOrigin', draft.countryOfOrigin.trim());

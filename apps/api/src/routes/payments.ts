@@ -6,6 +6,8 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole, requirePermission } from '../middleware/auth';
 import { encryptJson, decryptJson } from '../lib/crypto';
 import { audit } from '../lib/audit';
+import { verifyWebhookSignature } from '../lib/razorpay';
+import { confirmOrderPaid } from '../lib/orderConfirm';
 
 const router = Router();
 
@@ -17,6 +19,52 @@ const razorpayCredsSchema = z.object({
   webhookSecret: z.string().optional(),
 });
 type RazorpayCreds = z.infer<typeof razorpayCredsSchema>;
+
+/**
+ * Razorpay webhook — the SOURCE OF TRUTH for payment confirmation. The client
+ * verify endpoint is only a fast-path hint; this guarantees an order reaches
+ * PAID even if the client never returns (closed tab, dropped network). Public
+ * route: authenticity comes from the HMAC signature, not a session.
+ *
+ * The signature is verified against the per-vendor webhook secret when the order
+ * used a vendor Razorpay account, otherwise the platform RAZORPAY_WEBHOOK_SECRET.
+ */
+router.post('/webhook', async (req, res, next) => {
+  try {
+    const signature = req.header('x-razorpay-signature') || '';
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    if (!rawBody) return res.status(400).json({ error: 'Missing body' });
+
+    const event = req.body ?? {};
+    // Extract the Razorpay order id from the (still-untrusted) payload.
+    const rzpOrderId: string | undefined =
+      event?.payload?.payment?.entity?.order_id || event?.payload?.order?.entity?.id;
+    if (!rzpOrderId) return res.status(200).json({ ok: true, ignored: true });
+
+    const order = await prisma.order.findUnique({
+      where: { razorpayOrderId: rzpOrderId },
+      include: { paymentMethodRef: true },
+    });
+
+    // Resolve the verifying secret: vendor account secret if applicable, else platform.
+    let secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (order?.paymentMethodRef?.credentials) {
+      try {
+        const creds = decryptJson<RazorpayCreds>(order.paymentMethodRef.credentials);
+        if (creds.webhookSecret) secret = creds.webhookSecret;
+      } catch { /* fall back to platform secret */ }
+    }
+    if (!verifyWebhookSignature(rawBody, signature, secret)) {
+      return res.status(400).json({ error: 'Invalid webhook signature' });
+    }
+
+    if ((event.event === 'payment.captured' || event.event === 'order.paid') && order) {
+      const paymentId: string | null = event?.payload?.payment?.entity?.id ?? null;
+      await confirmOrderPaid({ orderId: order.id, razorpayPaymentId: paymentId });
+    }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
 
 const upiPublicSchema = z.object({
   vpa: z.string().regex(/^[\w.\-]+@[\w.\-]+$/, 'Invalid UPI VPA'),

@@ -9,6 +9,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { uploadBuffer } from '../lib/cloudinary';
 import { indexProduct, removeProductFromIndex } from '../lib/algolia';
+import { parse as parseCsv } from 'csv-parse/sync';
 
 const router = Router();
 const upload = multer({
@@ -100,6 +101,7 @@ const productInputSchema = z.object({
   makingChargeValue:  z.coerce.number().nonnegative().optional(),
   wastagePercent:     z.coerce.number().min(0).max(100).optional(),
   hallmarked:         coerceBool,
+  huid:               z.string().trim().max(20).optional(),
   certifiedBy:        z.string().max(40).optional(),
   certificateNumber:  z.string().max(80).optional(),
   hsnCode:            z.string().max(20).optional(),
@@ -140,7 +142,7 @@ router.get('/', async (req, res) => {
   const take = Math.min(parseInt(limit) || 20, 100);
   const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
 
-  const where: any = { isActive: true, vendor: { status: VendorStatus.APPROVED } };
+  const where: any = { isActive: true, status: ProductStatus.ACTIVE, vendor: { status: VendorStatus.APPROVED } };
 
   if (category) {
     // Accept either a UUID or a slug. Match the category AND any of its children
@@ -331,6 +333,121 @@ router.get('/vendor/mine', requireAuth, requireRole(Role.VENDOR), async (req, re
   res.json(products);
 });
 
+// Multi-value CSV fields (materials/tags/images) use "|" so commas in CSV are safe.
+function splitList(v: unknown): string[] {
+  if (typeof v !== 'string' || !v.trim()) return [];
+  return v.split('|').map((s) => s.trim()).filter(Boolean);
+}
+function csvCell(v: unknown): string {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// VENDOR: bulk export own catalogue as CSV (template for re-import)
+router.get('/vendor/bulk-export', requireAuth, requireRole(Role.VENDOR), async (req, res, next) => {
+  try {
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not created' });
+    const products = await prisma.product.findMany({
+      where: { vendorId: vendor.id },
+      orderBy: { createdAt: 'desc' },
+      include: { category: { select: { slug: true } } },
+    });
+    const header = ['name', 'description', 'category', 'price', 'stock', 'sku', 'metalType', 'jewelleryType', 'materials', 'tags', 'images', 'status'];
+    const lines = [header.join(',')];
+    for (const p of products) {
+      lines.push([
+        p.name, p.description ?? '', p.category?.slug ?? '', Number(p.price), p.stockQuantity, p.sku ?? '',
+        p.metalType ?? '', p.jewelleryType ?? '', p.materials.join('|'), p.tags.join('|'), p.images.join('|'), p.status,
+      ].map(csvCell).join(','));
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="products.csv"');
+    res.send(lines.join('\n'));
+  } catch (e) { next(e); }
+});
+
+// VENDOR: bulk import products from CSV. New listings enter PENDING_REVIEW.
+router.post('/vendor/bulk-import', requireAuth, requireRole(Role.VENDOR), upload.single('file'), async (req, res, next) => {
+  try {
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not created' });
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'CSV file is required (field "file")' });
+
+    let records: Record<string, string>[];
+    try {
+      records = parseCsv(file.buffer, { columns: true, skip_empty_lines: true, trim: true, bom: true });
+    } catch {
+      return res.status(400).json({ error: 'Could not parse the CSV. Export the template first to see the expected columns.' });
+    }
+    if (records.length > 2000) return res.status(400).json({ error: 'Limit 2000 rows per import' });
+
+    const cats = await prisma.category.findMany({ where: { isActive: true }, select: { id: true, slug: true } });
+    const catBySlug = new Map(cats.map((c) => [c.slug, c.id]));
+    const jewelleryTypes = new Set(Object.values(JewelleryType) as string[]);
+
+    let created = 0;
+    const errors: { row: number; error: string }[] = [];
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      const rowNo = i + 2; // header is row 1
+      const name = (r.name || '').trim();
+      const price = Number(r.price);
+      const categoryId = catBySlug.get((r.category || '').trim());
+      if (!name) { errors.push({ row: rowNo, error: 'name is required' }); continue; }
+      if (!categoryId) { errors.push({ row: rowNo, error: `unknown category slug "${r.category}"` }); continue; }
+      if (!(price > 0)) { errors.push({ row: rowNo, error: 'price must be a positive number' }); continue; }
+      const jt = (r.jewelleryType || '').trim().toUpperCase();
+      try {
+        const slug = await uniqueProductSlug(name);
+        await prisma.product.create({
+          data: {
+            vendorId: vendor.id, name, slug,
+            description: (r.description || '').trim() || null,
+            categoryId,
+            price,
+            stockQuantity: Math.max(0, parseInt(r.stock || '0', 10) || 0),
+            sku: (r.sku || '').trim() || null,
+            metalType: (r.metalType || '').trim() || null,
+            materials: splitList(r.materials),
+            tags: splitList(r.tags),
+            images: splitList(r.images),
+            status: ProductStatus.PENDING_REVIEW,
+            isActive: false,
+            ...(jt && jewelleryTypes.has(jt) ? { jewelleryType: jt as JewelleryType } : {}),
+          },
+        });
+        created++;
+      } catch (e: any) { errors.push({ row: rowNo, error: e?.message || 'failed to create' }); }
+    }
+    res.json({ created, failed: errors.length, errors: errors.slice(0, 50), note: 'Imported products are pending admin review before going live.' });
+  } catch (e) { next(e); }
+});
+
+// VENDOR: bulk stock update (inventory management)
+const bulkStockSchema = z.object({
+  updates: z.array(z.object({ id: z.string().uuid(), stockQuantity: z.number().int().min(0) })).min(1).max(500),
+});
+router.patch('/vendor/bulk-stock', requireAuth, requireRole(Role.VENDOR), async (req, res, next) => {
+  try {
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not created' });
+    const parsed = bulkStockSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+    const ids = parsed.data.updates.map((u) => u.id);
+    const owned = await prisma.product.findMany({ where: { id: { in: ids }, vendorId: vendor.id }, select: { id: true } });
+    const ownedSet = new Set(owned.map((o) => o.id));
+    const valid = parsed.data.updates.filter((u) => ownedSet.has(u.id));
+    if (valid.length === 0) return res.status(400).json({ error: 'No matching products' });
+
+    await prisma.$transaction(valid.map((u) => prisma.product.update({ where: { id: u.id }, data: { stockQuantity: u.stockQuantity } })));
+    for (const u of valid) { indexProduct(u.id).catch(() => {}); } // keep search in sync
+    res.json({ updated: valid.length });
+  } catch (e) { next(e); }
+});
+
 // VENDOR: get own product by id — returns drafts/inactive too (used by the listing editor)
 router.get('/vendor/:id', requireAuth, requireRole(Role.VENDOR), async (req, res) => {
   const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
@@ -412,7 +529,7 @@ router.post(
       const {
         attributeValues, shippingMethodDefaultId, shopSectionId, returnPolicyId,
         tags, materials, variations, combos, videoUrl,
-        hsnCode, countryOfOrigin, certifiedBy, certificateNumber,
+        hsnCode, countryOfOrigin, certifiedBy, certificateNumber, huid,
         baseMetal, plating, careInstructions,
         imageAlts, highlights, brand, warranty, seoTitle, seoDescription,
         ...productData
@@ -454,11 +571,17 @@ router.post(
             ...(plating ? { plating } : {}),
             ...(certifiedBy ? { certifiedBy } : {}),
             ...(certificateNumber ? { certificateNumber } : {}),
+            ...(huid ? { huid } : {}),
             ...(careInstructions ? { careInstructions } : {}),
             ...(hsnCode ? { hsnCode } : {}),
             ...(countryOfOrigin ? { countryOfOrigin } : {}),
             vendorId: vendor.id,
             images: imageUrls,
+            // Moderation gate: a brand-new listing awaits admin review before it
+            // goes live (an explicit DRAFT save stays a draft). Admin approval
+            // flips it to ACTIVE + isActive, which also triggers Algolia indexing.
+            status: productData.status === ProductStatus.DRAFT ? ProductStatus.DRAFT : ProductStatus.PENDING_REVIEW,
+            isActive: false,
             ...(attributeValues?.length
               ? {
                   attributeValues: {
@@ -578,7 +701,7 @@ router.put(
     const {
       attributeValues, shippingMethodDefaultId, shopSectionId, returnPolicyId,
       tags, materials, variations, combos, keepImages, videoUrl,
-      hsnCode, countryOfOrigin, certifiedBy, certificateNumber,
+      hsnCode, countryOfOrigin, certifiedBy, certificateNumber, huid,
       baseMetal, plating, careInstructions,
       imageAlts, highlights, brand, warranty, seoTitle, seoDescription,
       ...productData
@@ -648,6 +771,7 @@ router.put(
             ...(plating           !== undefined ? { plating:           plating           || null } : {}),
             ...(certifiedBy       !== undefined ? { certifiedBy:       certifiedBy       || null } : {}),
             ...(certificateNumber !== undefined ? { certificateNumber: certificateNumber || null } : {}),
+            ...(huid              !== undefined ? { huid:              huid              || null } : {}),
             ...(careInstructions  !== undefined ? { careInstructions:  careInstructions  || null } : {}),
             ...(hsnCode           ? { hsnCode } : {}),
             ...(countryOfOrigin   ? { countryOfOrigin } : {}),

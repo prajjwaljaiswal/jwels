@@ -57,6 +57,7 @@ export interface ListingDraft {
   hallmarked: boolean;
   certifiedBy: string;
   certificateNumber: string;
+  huid: string;
   hsnCode: string;
   gstRatePercent: string;
   countryOfOrigin: string;
@@ -125,6 +126,7 @@ export const EMPTY_DRAFT: ListingDraft = {
   hallmarked: false,
   certifiedBy: '',
   certificateNumber: '',
+  huid: '',
   hsnCode: '',
   gstRatePercent: '',
   countryOfOrigin: 'IN',

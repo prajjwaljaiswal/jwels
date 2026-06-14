@@ -33,3 +33,21 @@ export function verifyPaymentSignature(params: {
     .digest('hex');
   return expected === razorpaySignature;
 }
+
+/**
+ * Verify a Razorpay webhook signature: HMAC-SHA256 over the RAW request body
+ * keyed by the webhook secret (RAZORPAY_WEBHOOK_SECRET). Uses a timing-safe
+ * comparison.
+ */
+export function verifyWebhookSignature(rawBody: Buffer | string, signature: string, secret?: string): boolean {
+  const key = secret ?? process.env.RAZORPAY_WEBHOOK_SECRET ?? '';
+  if (!key || !signature) return false;
+  const expected = crypto.createHmac('sha256', key).update(rawBody).digest('hex');
+  try {
+    const a = Buffer.from(expected);
+    const b = Buffer.from(signature);
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}

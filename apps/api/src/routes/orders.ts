@@ -4,13 +4,39 @@ import { z } from 'zod';
 import { OrderStatus, PaymentProvider, Role, VendorPaymentMethod } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { checkoutLimiter } from '../middleware/rateLimit';
 import { razorpay, razorpayClient, verifyPaymentSignature } from '../lib/razorpay';
 import { decryptJson } from '../lib/crypto';
 import { priceSelection, isSystemDefaultMethodId, priceSystemDefault } from '../lib/shipping';
 import { resolveCoupon, couponRedemptionOps } from '../lib/coupon';
 import { uploadBuffer } from '../lib/cloudinary';
+import { confirmOrderPaid, notifyOrderConfirmation } from '../lib/orderConfirm';
+import { createInvoiceForOrder, generateInvoicePdf } from '../lib/invoice';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+
+/**
+ * Resolve the authoritative gift-wrap fee from the vendor's published CHECKOUT
+ * page block settings. Never trust a client-sent amount.
+ */
+async function resolveGiftWrapFee(vendorId: string): Promise<number> {
+  try {
+    const page = await prisma.vendorPage.findFirst({
+      where: { vendorId, pageKind: 'CHECKOUT' as any, isPublished: true },
+    });
+    if (!page) return 0;
+    const latest = await prisma.vendorPageVersion.findFirst({
+      where: { pageId: page.id },
+      orderBy: { versionNum: 'desc' },
+    });
+    const blocks = (latest?.blocks ?? []) as Array<{ type?: string; settings?: { price?: number } }>;
+    const gw = blocks.find((b) => b?.type === 'checkoutGiftWrap');
+    const price = Number(gw?.settings?.price ?? 0);
+    return Number.isFinite(price) && price > 0 ? Math.min(price, 100000) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 interface RazorpayCreds { keyId: string; keySecret: string; webhookSecret?: string }
 
@@ -104,6 +130,8 @@ const checkoutSchema = z.object({
   shippingSelections: z.array(shippingSelectionSchema).default([]),
   paymentMethodId: z.string().uuid().optional(),
   couponCode: z.string().min(1).optional(),
+  giftWrap: z.boolean().default(false),
+  giftMessage: z.string().max(500).optional(),
 });
 
 /**
@@ -189,11 +217,11 @@ async function resolveShipping(
  * Step 1 of checkout — server-side: validate cart, lock prices, create DB order + Razorpay order.
  * Returns the Razorpay order id and key for the client to open Checkout.
  */
-router.post('/checkout', requireAuth, async (req, res) => {
+router.post('/checkout', checkoutLimiter, requireAuth, async (req, res) => {
   const parsed = checkoutSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { items, shippingAddress, shippingSelections, paymentMethodId, couponCode } = parsed.data;
+  const { items, shippingAddress, shippingSelections, paymentMethodId, couponCode, giftWrap, giftMessage } = parsed.data;
 
   // Re-fetch products to lock the price server-side (never trust client-sent prices)
   const products = await prisma.product.findMany({
@@ -270,7 +298,9 @@ router.post('/checkout', requireAuth, async (req, res) => {
   }
 
   const discount = coupon?.discount ?? 0;
-  const totalRupees = Math.max(0, goodsRupees + shipping.total - discount);
+  // Gift wrap (optional) — fee is resolved server-side from the vendor's block settings.
+  const giftWrapFee = giftWrap ? await resolveGiftWrapFee(cartVendorId) : 0;
+  const totalRupees = Math.max(0, goodsRupees + shipping.total - discount + giftWrapFee);
   const amountPaise = Math.round(totalRupees * 100);
 
   // Resolve payment method: vendor-specific if provided, else fall back to platform creds.
@@ -296,6 +326,30 @@ router.post('/checkout', requireAuth, async (req, res) => {
     rzpKeyId = creds.keyId;
     methodId = method.id;
     methodSnapshot = `RAZORPAY:${method.label}`;
+  }
+
+  // Idempotency: if the client retries with the same key, return the existing
+  // order instead of creating a duplicate Razorpay order + DB order.
+  const idempotencyKey = req.header('Idempotency-Key') || null;
+  if (idempotencyKey) {
+    const existing = await prisma.order.findUnique({ where: { idempotencyKey } });
+    if (existing) {
+      if (existing.customerId !== req.user!.id) {
+        return res.status(409).json({ error: 'Idempotency key already in use' });
+      }
+      return res.status(200).json({
+        orderId: existing.id,
+        razorpayOrderId: existing.razorpayOrderId,
+        amount: Math.round(Number(existing.totalAmount) * 100),
+        currency: 'INR',
+        razorpayKeyId: rzpKeyId,
+        shippingTotal: Number(existing.shippingTotal),
+        goodsTotal: goodsRupees,
+        discount: Number(existing.discountAmount),
+        couponCode: existing.couponCode,
+        idempotent: true,
+      });
+    }
   }
 
   // Create Razorpay order against the resolved client (vendor's account or platform fallback).
@@ -328,6 +382,10 @@ router.post('/checkout', requireAuth, async (req, res) => {
       couponId: coupon?.couponId ?? null,
       couponCode: coupon?.code ?? null,
       discountAmount: discount,
+      giftWrap,
+      giftMessage: giftMessage ?? null,
+      giftWrapFee,
+      idempotencyKey,
       status: OrderStatus.PENDING,
       items: {
         create: items.map((i) => {
@@ -373,11 +431,11 @@ router.post('/checkout', requireAuth, async (req, res) => {
  * through Razorpay; the order is created PENDING and the customer settles later
  * (cash on delivery, UPI to vendor's VPA, or wire transfer).
  */
-router.post('/cod', requireAuth, async (req, res) => {
+router.post('/cod', checkoutLimiter, requireAuth, async (req, res) => {
   const parsed = checkoutSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const { items, shippingAddress, shippingSelections, paymentMethodId, couponCode } = parsed.data;
+  const { items, shippingAddress, shippingSelections, paymentMethodId, couponCode, giftWrap, giftMessage } = parsed.data;
 
   const products = await prisma.product.findMany({
     where: { id: { in: items.map((i) => i.productId) }, isActive: true },
@@ -474,7 +532,8 @@ router.post('/cod', requireAuth, async (req, res) => {
   }
 
   const codDiscount = codCoupon?.discount ?? 0;
-  const totalRupees = Math.max(0, goodsRupees + shipping.total - codDiscount);
+  const codGiftWrapFee = giftWrap ? await resolveGiftWrapFee(cartVendorId) : 0;
+  const totalRupees = Math.max(0, goodsRupees + shipping.total - codDiscount + codGiftWrapFee);
   const seenVendor = new Set<string>();
 
   const order = await prisma.order.create({
@@ -487,6 +546,9 @@ router.post('/cod', requireAuth, async (req, res) => {
       couponId: codCoupon?.couponId ?? null,
       couponCode: codCoupon?.code ?? null,
       discountAmount: codDiscount,
+      giftWrap,
+      giftMessage: giftMessage ?? null,
+      giftWrapFee: codGiftWrapFee,
       shippingAddress,
       status: OrderStatus.PENDING,
       items: {
@@ -548,6 +610,10 @@ router.post('/cod', requireAuth, async (req, res) => {
     )
   );
 
+  // Generate the tax invoice + send confirmation (best-effort, non-blocking).
+  createInvoiceForOrder(order.id).catch((e) => console.warn('[invoice] COD generation failed:', e?.message));
+  void notifyOrderConfirmation(order.id);
+
   // For UPI/bank, return the public payout details so the customer can pay manually.
   res.status(201).json({ orderId: order.id, paymentInstructions: publicConfig });
 });
@@ -563,7 +629,7 @@ const verifySchema = z.object({
  * Step 2 — client posts the Razorpay response here. Verify signature, mark order PAID,
  * decrement stock, and set per-item status to PAID.
  */
-router.post('/verify-payment', requireAuth, async (req, res) => {
+router.post('/verify-payment', checkoutLimiter, requireAuth, async (req, res) => {
   const parsed = verifySchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = parsed.data;
@@ -593,35 +659,10 @@ router.post('/verify-payment', requireAuth, async (req, res) => {
   const ok = verifyPaymentSignature({ razorpayOrderId, razorpayPaymentId, razorpaySignature, secret });
   if (!ok) return res.status(400).json({ error: 'Invalid payment signature' });
 
-  // Atomically: decrement stock, mark order PAID, record coupon redemption (if any)
-  const couponOps = order.couponId
-    ? couponRedemptionOps({
-        couponId: order.couponId,
-        orderId: order.id,
-        customerId: order.customerId,
-        amount: Number(order.discountAmount),
-      })
-    : [];
-
-  await prisma.$transaction([
-    ...order.items.map((it) =>
-      prisma.product.update({
-        where: { id: it.productId },
-        data: { stockQuantity: { decrement: it.quantity } },
-      })
-    ),
-    prisma.order.update({
-      where: { id: order.id },
-      data: { status: OrderStatus.PAID, razorpayPaymentId },
-    }),
-    prisma.orderItem.updateMany({
-      where: { orderId: order.id },
-      data: { status: OrderStatus.PAID },
-    }),
-    ...couponOps,
-  ]);
-
-  res.json({ success: true, orderId: order.id });
+  // Atomically confirm PAID exactly once (shared with the Razorpay webhook) —
+  // decrements stock, redeems coupon, generates the invoice, and emails the buyer.
+  const result = await confirmOrderPaid({ orderId: order.id, razorpayPaymentId });
+  res.json({ success: true, orderId: order.id, alreadyProcessed: result.alreadyProcessed });
 });
 
 // Customer: single order detail
@@ -641,6 +682,32 @@ router.get('/me/:id', requireAuth, async (req, res) => {
     return res.status(404).json({ error: 'Order not found' });
   }
   res.json(order);
+});
+
+// Customer: download the GST invoice PDF for an own order
+router.get('/me/:id/invoice', requireAuth, async (req, res, next) => {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, customerId: true, status: true },
+    });
+    if (!order || order.customerId !== req.user!.id) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    let invoice = await prisma.invoice.findUnique({ where: { orderId: order.id } });
+    if (!invoice) {
+      // Only invoice orders that have actually been paid/fulfilled.
+      if (!['PAID', 'SHIPPED', 'DELIVERED'].includes(order.status)) {
+        return res.status(404).json({ error: 'Invoice not yet available for this order' });
+      }
+      invoice = await createInvoiceForOrder(order.id);
+    }
+    if (!invoice) return res.status(404).json({ error: 'Invoice not available' });
+    const pdf = await generateInvoicePdf(invoice);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="invoice-${invoice.invoiceNumber.replace(/\//g, '-')}.pdf"`);
+    res.send(pdf);
+  } catch (e) { next(e); }
 });
 
 // Customer: list own orders

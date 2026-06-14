@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { assertEncryptionKeyConfigured } from './lib/crypto';
+import { buildCorsOptions } from './lib/cors';
+import { logger } from './lib/logger';
 
 assertEncryptionKeyConfigured();
 
@@ -35,23 +38,38 @@ import addressRouter from './routes/addresses';
 import questionsRouter from './routes/questions';
 import collectionsRouter from './routes/collections';
 import fulfillmentRouter from './routes/fulfillment';
+import returnsRouter from './routes/returns';
 import { startAbandonedCartJob } from './jobs/abandonedCart';
 import { startAutoDeliverJob } from './jobs/autoDeliver';
+import { startSettlementJob } from './jobs/settlement';
 
 const app = express();
 
-const corsOptions: cors.CorsOptions = {
-  origin: true,           // echo request Origin — required when credentials: true
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['Content-Length', 'Content-Range'],
-  maxAge: 86400,
-};
+// Trust the first reverse proxy (PM2/nginx) so req.ip / X-Forwarded-For reflect
+// the real client — required for rate limiting to key on the actual caller.
+app.set('trust proxy', 1);
+
+// Security headers. CSP is disabled here (this API only returns JSON; CSP belongs
+// on the Next.js apps) and CORP is set to cross-origin since the API is consumed
+// from other origins.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+const corsOptions = buildCorsOptions();
 app.use(cors(corsOptions));
 // Preflight must use the same options so browsers get matching headers
 app.options('*', cors(corsOptions));
-app.use(express.json({ limit: '1mb' }));
+// Capture the raw body so webhook handlers can verify HMAC signatures over the
+// exact bytes Razorpay signed.
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, _res, buf) => { (req as any).rawBody = buf; },
+}));
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
@@ -77,10 +95,11 @@ app.use('/api/addresses', addressRouter);
 app.use('/api/questions', questionsRouter);
 app.use('/api/collections', collectionsRouter);
 app.use('/api/fulfillment', fulfillmentRouter);
+app.use('/api/returns', returnsRouter);
 
 // Generic error handler
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(err);
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ method: req.method, path: req.originalUrl, err: err?.message, stack: err?.stack }, 'request failed');
   if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'Payload too large' });
   res.status(500).json({ error: 'Internal server error' });
 });
@@ -90,4 +109,5 @@ app.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`);
   startAbandonedCartJob();
   startAutoDeliverJob();
+  startSettlementJob();
 });

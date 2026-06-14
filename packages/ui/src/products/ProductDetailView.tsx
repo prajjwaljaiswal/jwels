@@ -12,6 +12,8 @@ import { ProductGallery } from '@/components/products/ProductGallery';
 import { DeliveryEstimator } from '@/components/products/DeliveryEstimator';
 import { ProductRail } from '@/components/products/ProductRail';
 import { ProductQA } from '@/components/products/ProductQA';
+import { SizeGuide } from '@/components/products/SizeGuide';
+import { TrustBadges } from '@/components/products/TrustBadges';
 import type { ProductCardData } from '@/components/storefront/ProductCard';
 import { pushRecentlyViewed, getRecentlyViewed } from '@/lib/recently-viewed';
 
@@ -28,6 +30,11 @@ interface Product {
   highlights?: string[];
   warranty?: string | null;
   certificateImageUrl?: string | null;
+  hallmarked?: boolean | null;
+  huid?: string | null;
+  certifiedBy?: string | null;
+  certificateNumber?: string | null;
+  careInstructions?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
   category: { id: string; name: string; slug: string };
@@ -452,6 +459,10 @@ export function ProductDetailView({ productId }: { productId: string }) {
             <WishlistButton productId={product.id} variant="pill" className="w-full justify-center" />
           </div>
 
+          <SizeGuide category={product.category} />
+
+          <TrustBadges hallmarked={product.hallmarked} className="mt-2" />
+
           <DeliveryEstimator productId={product.id} />
 
           <ul className="space-y-2 pt-2">
@@ -499,6 +510,53 @@ export function ProductDetailView({ productId }: { productId: string }) {
               </div>
             ))}
           </div>
+
+          {(product.hallmarked || product.huid || product.certifiedBy || product.certificateNumber) && (
+            <div className="pt-3">
+              <p className="text-xs uppercase tracking-wide font-semibold text-ink-700 mb-2">Certification &amp; Hallmark</p>
+              <div className="rounded-md border border-line bg-canvas p-4 space-y-2 text-sm">
+                {product.hallmarked && (
+                  <div className="flex items-center gap-2 text-ink-900 font-semibold">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 12l2 2 4-4" />
+                      <circle cx="12" cy="12" r="9" />
+                    </svg>
+                    BIS Hallmarked
+                  </div>
+                )}
+                {product.huid && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-ink-700">HUID</span>
+                    <span className="font-mono font-semibold text-ink-900">{product.huid}</span>
+                  </div>
+                )}
+                {product.certifiedBy && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-ink-700">Certified by</span>
+                    <span className="font-semibold text-ink-900">{product.certifiedBy}</span>
+                  </div>
+                )}
+                {product.certificateNumber && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-ink-700">Certificate no.</span>
+                    <span className="font-mono text-ink-900">{product.certificateNumber}</span>
+                  </div>
+                )}
+                {product.huid && (
+                  <p className="text-[11px] text-ink-500 pt-1">
+                    Verify this 6-digit Hallmark Unique ID on the official <span className="font-semibold">BIS Care</span> app.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {product.careInstructions && (
+            <div className="pt-3">
+              <p className="text-xs uppercase tracking-wide font-semibold text-ink-700 mb-2">Care instructions</p>
+              <p className="text-sm text-ink-700 whitespace-pre-line">{product.careInstructions}</p>
+            </div>
+          )}
 
           {product.certificateImageUrl && (
             <div className="pt-3">

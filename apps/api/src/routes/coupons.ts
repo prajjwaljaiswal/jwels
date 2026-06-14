@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CouponDiscountType, CouponScope, Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { couponLimiter } from '../middleware/rateLimit';
 import { normalizeCode, resolveCoupon } from '../lib/coupon';
 
 const router = Router();
@@ -219,7 +220,7 @@ const previewSchema = z.object({
   })).min(1),
 });
 
-router.post('/preview', requireAuth, async (req, res) => {
+router.post('/preview', couponLimiter, requireAuth, async (req, res) => {
   const parsed = previewSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
   const { code, vendorId, items } = parsed.data;

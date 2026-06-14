@@ -1,36 +1,61 @@
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, ShipmentStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { isDbConnectionError } from '../lib/prisma-errors';
 
-const AUTO_DELIVER_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const SCAN_INTERVAL_MS = 60 * 60 * 1000;               // every 1 hour
+// Delivery confirmation policy:
+//   • Tracked shipments (a Shipment row exists) are closed ONLY on a real
+//     carrier/vendor DELIVERED (or COMPLETED) status — never on a blind timer.
+//     Faking "delivered" after N days generates disputes and bad payouts.
+//   • Untracked items (no Shipment row — manual / flat-rate fulfilment) have no
+//     tracking signal to consult, so a longer time-based fallback is the only
+//     available close mechanism.
+//   • Tracked-but-silent shipments (dispatched long ago, still not marked
+//     delivered) are HELD for ops review, not auto-closed.
+const UNTRACKED_AUTO_DELIVER_AFTER_MS = 10 * 24 * 60 * 60 * 1000; // 10 days
+const SCAN_INTERVAL_MS = 60 * 60 * 1000;                          // every 1 hour
+
+const DELIVERED_STATUSES = [ShipmentStatus.DELIVERED, ShipmentStatus.COMPLETED];
 
 export async function autoDeliverShippedItems(now: Date = new Date()): Promise<number> {
-  const cutoff = new Date(now.getTime() - AUTO_DELIVER_AFTER_MS);
-  const result = await prisma.orderItem.updateMany({
+  // 1) Reconcile: the carrier/vendor confirmed delivery but the OrderItem wasn't
+  //    synced (e.g. a future tracking-sync updated the Shipment directly). Close
+  //    these on the real signal, regardless of elapsed time.
+  const confirmed = await prisma.orderItem.updateMany({
     where: {
       status: OrderStatus.SHIPPED,
-      dispatchedAt: { lt: cutoff },
+      shipment: { status: { in: DELIVERED_STATUSES } },
     },
-    data: {
-      status: OrderStatus.DELIVERED,
-      deliveredAt: now,
-    },
+    data: { status: OrderStatus.DELIVERED, deliveredAt: now },
   });
 
-  // Also advance any Shipment records that are still in-transit past the cutoff
-  if (result.count > 0) {
-    await prisma.shipment.updateMany({
-      where: {
-        status: { in: ['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'] as any },
-        updatedAt: { lt: cutoff },
-        orderItem: { dispatchedAt: { lt: cutoff } },
-      },
-      data: { status: 'DELIVERED' as any },
-    });
+  // 2) Untracked fallback: no carrier shipment exists, so a timer is the only
+  //    available signal. Close after the (longer) grace window.
+  const untrackedCutoff = new Date(now.getTime() - UNTRACKED_AUTO_DELIVER_AFTER_MS);
+  const untracked = await prisma.orderItem.updateMany({
+    where: {
+      status: OrderStatus.SHIPPED,
+      dispatchedAt: { lt: untrackedCutoff },
+      shipment: { is: null },
+    },
+    data: { status: OrderStatus.DELIVERED, deliveredAt: now },
+  });
+
+  // 3) Visibility: tracked shipments dispatched long ago but still not marked
+  //    delivered are HELD (not auto-closed) and need ops attention.
+  const held = await prisma.orderItem.count({
+    where: {
+      status: OrderStatus.SHIPPED,
+      dispatchedAt: { lt: untrackedCutoff },
+      shipment: { status: { notIn: DELIVERED_STATUSES } },
+    },
+  });
+  if (held > 0) {
+    console.warn(
+      `[auto-deliver] ${held} tracked item(s) shipped >10d ago but not yet marked delivered — held for review, NOT auto-closed.`
+    );
   }
 
-  return result.count;
+  return confirmed.count + untracked.count;
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -41,7 +66,7 @@ export function startAutoDeliverJob() {
 
   const run = () => {
     autoDeliverShippedItems()
-      .then((n) => { if (n > 0) console.log(`[auto-deliver] marked ${n} item(s) as delivered`); })
+      .then((n) => { if (n > 0) console.log(`[auto-deliver] confirmed ${n} item(s) as delivered`); })
       .catch((e) => {
         if (isDbConnectionError(e)) {
           console.warn('[auto-deliver] skipped — database unreachable, will retry next tick');

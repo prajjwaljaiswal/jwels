@@ -9,6 +9,9 @@ import { setToken } from '@/lib/api';
 
 const NAV: Array<NavItem & { perm?: Permission | Permission[] }> = [
   { label: 'Overview',            href: '/',                   icon: Icons.Chart,   match: (p) => p === '/' },
+  { label: 'Orders',              href: '/orders',             icon: Icons.Wallet,  match: (p) => p.startsWith('/orders'),    perm: 'ORDER_VIEW' },
+  { label: 'Moderation',          href: '/moderation',         icon: Icons.Layers,  match: (p) => p.startsWith('/moderation'),perm: 'PRODUCT_VIEW' },
+  { label: 'Returns & disputes',  href: '/returns',            icon: Icons.Layers,  match: (p) => p.startsWith('/returns'),   perm: 'RETURN_MANAGE' },
   { label: 'Vendor approvals',    href: '/vendors',            icon: Icons.Users,   match: (p) => p.startsWith('/vendors'),   perm: 'VENDOR_VIEW' },
   { label: 'KYC review',          href: '/kyc',                icon: Icons.Users,   match: (p) => p.startsWith('/kyc'),       perm: 'VENDOR_APPROVE' },
   { label: 'Categories',          href: '/categories',         icon: Icons.Layers,  match: (p) => p === '/categories' || (p.startsWith('/categories/') && !p.startsWith('/categories/proposed')), perm: 'CATEGORY_MANAGE' },

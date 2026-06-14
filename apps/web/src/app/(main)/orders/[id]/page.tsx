@@ -73,6 +73,16 @@ const TIMELINE: { key: string; label: string }[] = [
   { key: 'DELIVERED', label: 'Delivered' },
 ];
 
+const RETURN_REASONS: { value: string; label: string }[] = [
+  { value: 'DAMAGED', label: 'Item arrived damaged' },
+  { value: 'NOT_AS_DESCRIBED', label: 'Not as described' },
+  { value: 'WRONG_ITEM', label: 'Wrong item received' },
+  { value: 'SIZE_ISSUE', label: 'Size / fit issue' },
+  { value: 'QUALITY', label: 'Quality not satisfactory' },
+  { value: 'CHANGED_MIND', label: 'Changed my mind' },
+  { value: 'OTHER', label: 'Other' },
+];
+
 function StatusPill({ status }: { status: string }) {
   const tone = STATUS_TONE[status] || 'bg-stone-100 text-stone-700 border-stone-200';
   return (
@@ -122,6 +132,11 @@ export default function OrderDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [openTrack, setOpenTrack] = useState<string | null>(null);
   const [trackData, setTrackData] = useState<Record<string, TrackResponse | 'loading' | 'error'>>({});
+  const [returns, setReturns] = useState<Record<string, { id: string; status: string }>>({});
+  const [returnFor, setReturnFor] = useState<OrderItem | null>(null);
+  const [reason, setReason] = useState('DAMAGED');
+  const [desc, setDesc] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -130,7 +145,52 @@ export default function OrderDetailPage() {
     api<Order>(`/api/orders/me/${id}`, { silent: true })
       .then((o) => { setOrder(o); setLoading(false); })
       .catch(() => { setNotFound(true); setLoading(false); });
+    loadReturns();
   }, [id, router]);
+
+  async function loadReturns() {
+    try {
+      const rows = await api<Array<{ id: string; status: string; orderItemId: string }>>('/api/returns/me', { silent: true });
+      const map: Record<string, { id: string; status: string }> = {};
+      for (const r of rows) map[r.orderItemId] = { id: r.id, status: r.status };
+      setReturns(map);
+    } catch { /* ignore */ }
+  }
+
+  async function submitReturn() {
+    if (!returnFor) return;
+    setSubmitting(true);
+    try {
+      await api('/api/returns', {
+        method: 'POST',
+        body: JSON.stringify({ orderItemId: returnFor.id, reason, description: desc || undefined }),
+      });
+      setReturnFor(null); setDesc(''); setReason('DAMAGED');
+      await loadReturns();
+      alert('Return requested. The seller will review it shortly.');
+    } catch (e: any) {
+      alert(e?.message || 'Could not submit the return request.');
+    } finally { setSubmitting(false); }
+  }
+
+  async function downloadInvoice() {
+    if (!id) return;
+    const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+    const key = process.env.NEXT_PUBLIC_TOKEN_KEY || 'token';
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+    try {
+      const res = await fetch(`${API}/api/orders/me/${id}/invoice`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) { alert('Invoice is not available for this order yet.'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 15000);
+    } catch {
+      alert('Could not download the invoice. Please try again.');
+    }
+  }
 
   async function toggleTrack(itemId: string) {
     if (openTrack === itemId) { setOpenTrack(null); return; }
@@ -170,6 +230,33 @@ export default function OrderDetailPage() {
 
   return (
     <div className="max-w-container mx-auto px-6 py-8">
+      {returnFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !submitting && setReturnFor(null)}>
+          <div className="bg-surface rounded-lg shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-xl text-ink-900">Request a return</h3>
+            <p className="text-sm text-ink-500 mt-1 line-clamp-1">{returnFor.product.name}</p>
+            <label className="block mt-4">
+              <span className="text-sm font-medium text-ink-900">Reason</span>
+              <select value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm bg-canvas">
+                {RETURN_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </label>
+            <label className="block mt-3">
+              <span className="text-sm font-medium text-ink-900">Details <span className="text-ink-500 font-normal">(optional)</span></span>
+              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} maxLength={1000}
+                placeholder="Tell the seller what went wrong…"
+                className="mt-1 w-full px-3 py-2 rounded-md border border-line text-sm bg-canvas" />
+            </label>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setReturnFor(null)} disabled={submitting} className="px-4 py-2 rounded-md border border-line text-sm text-ink-700 hover:border-ink-900 disabled:opacity-50">Cancel</button>
+              <button onClick={submitReturn} disabled={submitting} className="px-4 py-2 rounded-md bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50">
+                {submitting ? 'Submitting…' : 'Submit request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-xs mb-3">
         <Link href="/orders" className="text-ink-500 hover:text-ink-900">← Back to orders</Link>
       </div>
@@ -183,7 +270,17 @@ export default function OrderDetailPage() {
             <span className="font-mono">#{order.id.slice(0, 8).toUpperCase()}</span>
           </p>
         </div>
-        <StatusPill status={order.status} />
+        <div className="flex items-center gap-3">
+          {['PAID', 'SHIPPED', 'DELIVERED'].includes(order.status) && (
+            <button
+              onClick={downloadInvoice}
+              className="text-sm px-3 py-2 rounded-md border border-line text-ink-900 font-semibold hover:border-brand-700 hover:text-brand-700 transition"
+            >
+              ⬇ Download invoice
+            </button>
+          )}
+          <StatusPill status={order.status} />
+        </div>
       </div>
 
       {/* Timeline */}
@@ -243,6 +340,20 @@ export default function OrderDetailPage() {
                         <div className="mt-1.5"><StatusPill status={it.status} /></div>
                       </div>
                     </div>
+
+                    {it.status === 'DELIVERED' && (
+                      <div className="mt-3 text-xs">
+                        {returns[it.id] ? (
+                          <span className="text-ink-700">
+                            Return status: <span className="font-semibold capitalize">{returns[it.id].status.replace(/_/g, ' ').toLowerCase()}</span>
+                          </span>
+                        ) : (
+                          <button onClick={() => { setReturnFor(it); setReason('DAMAGED'); setDesc(''); }} className="text-brand-700 hover:underline font-medium">
+                            Request return
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {it.trackingNumber && (
                       <div className="mt-3 flex gap-3 text-xs">

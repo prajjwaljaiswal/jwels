@@ -90,8 +90,10 @@ enum PaymentMethodMode {
 
 enum ProductStatus {
   DRAFT
+  PENDING_REVIEW // submitted, awaiting admin moderation before going live
   ACTIVE
   INACTIVE
+  REJECTED       // moderation rejected; not searchable
 }
 
 enum ItemType {
@@ -177,6 +179,24 @@ enum Permission {
 
   PAYMENT_METHOD_VIEW
   PAYMENT_METHOD_MANAGE
+
+  // Admin super-console (full access + monitoring)
+  PRODUCT_VIEW
+  PRODUCT_MANAGE
+  PRODUCT_MODERATE
+  REVIEW_MODERATE
+  QUESTION_MODERATE
+  COUPON_VIEW
+  COUPON_MANAGE
+  RETURN_MANAGE
+  DISPUTE_MANAGE
+  ANALYTICS_VIEW
+  REPORT_EXPORT
+  IMPERSONATE
+  SYSTEM_MONITOR
+  NOTIFICATION_MANAGE
+  SHIPMENT_VIEW
+  INVOICE_VIEW
 }
 
 enum ShipmentStatus {
@@ -223,6 +243,8 @@ model User {
   reviews    Review[]
   adminRoles UserAdminRole[]
   auditLogs  AuditLog[]
+  returnRequests ReturnRequest[]
+  disputes   Dispute[]
   cart       Cart?
   wishlist   WishlistItem[]
   addresses  Address[]
@@ -321,6 +343,8 @@ model Vendor {
   shipments        Shipment[]
   manifests        Manifest[]
   pickups          CarrierPickup[]
+  payouts          Payout[]
+  returnRequests   ReturnRequest[]
 }
 
 enum VendorPageKind {
@@ -691,6 +715,7 @@ model Product {
   makingChargeValue Decimal?     @db.Decimal(10, 2)
   wastagePercent   Decimal?      @db.Decimal(5, 2)
   hallmarked       Boolean       @default(false)
+  huid             String?       // BIS 6-character Hallmark Unique ID (verify on BIS Care app)
   certifiedBy      String?       // BIS, IGI, SGL, GIA, OTHER
   certificateNumber String?
   hsnCode          String        @default("7113")
@@ -865,12 +890,23 @@ model Order {
   couponCode     String?
   discountAmount Decimal @db.Decimal(10, 2) @default(0)
 
+  // Gift wrap (optional upsell; fee resolved server-side from vendor block settings)
+  giftWrap       Boolean @default(false)
+  giftMessage    String?
+  giftWrapFee    Decimal @db.Decimal(10, 2) @default(0)
+
+  // Idempotency: a client-supplied key dedupes retried checkout submissions.
+  idempotencyKey String? @unique
+
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
   items       OrderItem[]
   redemption  CouponRedemption?
   shipments   Shipment[]
+  invoice     Invoice?
+  returns     ReturnRequest[]
+  disputes    Dispute[]
 
   @@index([customerId])
   @@index([status])
@@ -915,6 +951,8 @@ model OrderItem {
   variationLabel   String?  // e.g. "Size: M · Metal: Gold"
 
   shipment         Shipment?
+  payoutItem       PayoutItem?
+  returns          ReturnRequest[]
 
   @@index([orderId])
   @@index([vendorId])
@@ -1102,4 +1140,175 @@ model DeliveryProof {
   deliverySignature  String?
   proofOfDeliveryUrl String?
   createdAt          DateTime @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M1: Compliance & Money — invoices, payouts, returns/refunds/disputes
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id            String   @id @default(uuid())
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  invoiceNumber String   @unique
+  // Identity snapshots at issue time (configurable in admin settings)
+  sellerName    String?
+  sellerGstin   String?
+  sellerAddress String?
+  platformName  String?
+  platformGstin String?
+  buyerName     String
+  buyerState    String?
+  placeOfSupply String?
+  // Tax + totals (gold 3% + making 5% resolved per line)
+  isInterState  Boolean  @default(false)
+  subtotal      Decimal  @db.Decimal(12, 2)
+  cgst          Decimal  @db.Decimal(12, 2) @default(0)
+  sgst          Decimal  @db.Decimal(12, 2) @default(0)
+  igst          Decimal  @db.Decimal(12, 2) @default(0)
+  shippingTotal Decimal  @db.Decimal(12, 2) @default(0)
+  discountTotal Decimal  @db.Decimal(12, 2) @default(0)
+  grandTotal    Decimal  @db.Decimal(12, 2)
+  lineItems     Json     // [{ name, hsn, qty, unitPrice, taxableValue, gstRate, cgst, sgst, igst, total }]
+  irn           String?  // e-invoice IRN (≥₹ threshold sellers; placeholder for now)
+  qrCode        String?  // e-invoice QR payload (placeholder for now)
+  pdfUrl        String?  // Cloudinary URL of generated PDF
+  createdAt     DateTime @default(now())
+
+  @@index([orderId])
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  ON_HOLD
+}
+
+model Payout {
+  id               String       @id @default(uuid())
+  vendorId         String
+  vendor           Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  periodStart      DateTime
+  periodEnd        DateTime
+  grossAmount      Decimal      @db.Decimal(12, 2) // delivered item revenue (excl. shipping)
+  commissionAmount Decimal      @db.Decimal(12, 2) // platform commission deducted
+  refundAmount     Decimal      @db.Decimal(12, 2) @default(0) // refunds netted off
+  netAmount        Decimal      @db.Decimal(12, 2) // payable to vendor
+  status           PayoutStatus @default(PENDING)
+  provider         String       @default("MANUAL") // MANUAL | RAZORPAYX
+  providerRef      String?      // payout id from rail
+  utr              String?      // bank UTR / transaction ref
+  notes            String?
+  processedAt      DateTime?
+  processedBy      String?      // admin user id
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  items            PayoutItem[]
+
+  @@index([vendorId, status])
+  @@index([status])
+}
+
+model PayoutItem {
+  id          String    @id @default(uuid())
+  payoutId    String
+  payout      Payout    @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  orderItemId String    @unique
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  gross       Decimal   @db.Decimal(12, 2)
+  commission  Decimal   @db.Decimal(12, 2)
+  net         Decimal   @db.Decimal(12, 2)
+
+  @@index([payoutId])
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  PICKUP_SCHEDULED
+  RECEIVED
+  REFUNDED
+  CANCELLED
+}
+
+enum ReturnReason {
+  DAMAGED
+  NOT_AS_DESCRIBED
+  WRONG_ITEM
+  SIZE_ISSUE
+  QUALITY
+  CHANGED_MIND
+  OTHER
+}
+
+enum RefundStatus {
+  NONE
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ReturnRequest {
+  id               String       @id @default(uuid())
+  orderId          String
+  order            Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItemId      String
+  orderItem        OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  customerId       String
+  customer         User         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vendorId         String
+  vendor           Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  reason           ReturnReason
+  description      String?
+  photoUrls        String[]     @default([])
+  status           ReturnStatus @default(REQUESTED)
+  vendorNote       String?
+  // Refund tracking
+  refundStatus     RefundStatus @default(NONE)
+  refundAmount     Decimal      @db.Decimal(12, 2) @default(0)
+  razorpayRefundId String?
+  refundedAt       DateTime?
+  resolvedBy       String?      // admin/vendor user id
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  dispute          Dispute?
+
+  @@index([orderId])
+  @@index([vendorId, status])
+  @@index([customerId])
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
+  ESCALATED
+}
+
+model Dispute {
+  id              String         @id @default(uuid())
+  returnRequestId String?        @unique
+  returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id], onDelete: SetNull)
+  orderId         String
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  raisedById      String
+  raisedBy        User           @relation(fields: [raisedById], references: [id], onDelete: Cascade)
+  subject         String
+  detail          String?
+  status          DisputeStatus  @default(OPEN)
+  resolution      String?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status])
+  @@index([orderId])
 }

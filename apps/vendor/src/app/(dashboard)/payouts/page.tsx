@@ -17,15 +17,27 @@ interface PayoutItem {
   payout: number;
 }
 
+interface Settlement {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  netAmount: string;
+  status: string;
+  utr: string | null;
+  processedAt: string | null;
+}
+
 interface Payouts {
   commissionRate: number;
   payable: number;
+  settled: number;
   pipeline: number;
   lifetimeGross: number;
   lifetimeCommission: number;
   lifetimePayout: number;
   bank: { accountName: string | null; accountNumber: string | null; ifsc: string | null };
   items: PayoutItem[];
+  settlements: Settlement[];
 }
 
 export default function VendorPayoutsPage() {
@@ -103,6 +115,41 @@ export default function VendorPayoutsPage() {
               </p>
             </div>
             <Link href="/sell/onboard" className="btn-secondary text-sm">Update</Link>
+          </div>
+        </Card>
+      )}
+
+      {data.settlements && data.settlements.length > 0 && (
+        <Card className="overflow-hidden mb-8">
+          <div className="px-5 py-4 border-b border-line">
+            <h2 className="font-semibold text-ink-900">Settlements</h2>
+            <p className="text-xs text-ink-500 mt-0.5">Payout runs created from your delivered orders.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-ink-500">
+                <tr>
+                  <th className="px-5 py-3 font-semibold">Period</th>
+                  <th className="px-5 py-3 font-semibold text-right">Net amount</th>
+                  <th className="px-5 py-3 font-semibold">Status</th>
+                  <th className="px-5 py-3 font-semibold">UTR</th>
+                  <th className="px-5 py-3 font-semibold">Paid on</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.settlements.map((s) => (
+                  <tr key={s.id} className="border-t border-line">
+                    <td className="px-5 py-3 text-ink-700 whitespace-nowrap">
+                      {new Date(s.periodStart).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} – {new Date(s.periodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </td>
+                    <td className="px-5 py-3 text-right font-semibold font-mono">{fmt(Number(s.netAmount))}</td>
+                    <td className="px-5 py-3"><StatusPill tone={s.status === 'PAID' ? 'success' : s.status === 'PENDING' ? 'warn' : 'neutral'}>{s.status}</StatusPill></td>
+                    <td className="px-5 py-3 font-mono text-xs text-ink-500">{s.utr || '—'}</td>
+                    <td className="px-5 py-3 text-ink-700">{s.processedAt ? new Date(s.processedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </Card>
       )}

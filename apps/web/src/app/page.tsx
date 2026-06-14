@@ -31,7 +31,7 @@ const TICKER = [
   '✦ BIS HALLMARKED · IGI CERTIFIED',
   '✦ 30-DAY EASY RETURNS',
   '✦ MADE IN INDIA, BY INDEPENDENT ARTISANS',
-  '✦ GST-COMPLIANT INVOICES, AUTOMATED',
+  '✦ GST-READY INVOICING',
 ];
 
 const VENDOR_TICKER = [
@@ -100,7 +100,7 @@ const FAQS = [
   },
   {
     q: 'How and when do I get paid?',
-    a: 'Payouts run every week through Razorpay, direct to your bank account. We generate GST-compliant invoices for both you and your customer automatically. Every transaction is visible in your payouts dashboard.',
+    a: 'Payouts run every week through Razorpay, direct to your bank account. We provide GST-ready invoicing with the right HSN and tax breakup for both you and your customer. Every transaction is visible in your payouts dashboard.',
   },
   {
     q: 'Who handles shipping and returns?',
@@ -108,7 +108,7 @@ const FAQS = [
   },
   {
     q: 'Do I need GST registration to sell?',
-    a: 'You can start without GST if your annual turnover is under ₹40 lakh. Above that, GST registration is required by law. We issue GST-compliant invoices from day one for both you and your customers.',
+    a: 'You can start without GST if your annual turnover is under ₹40 lakh. Above that, GST registration is required by law. We provide GST-ready invoicing for both you and your customers.',
   },
   {
     q: 'How does Vrindaonline verify artisans?',
@@ -563,7 +563,7 @@ export default function HomePage() {
                 {[
                   'BIS hallmarking and IGI/SGL gemstone verification',
                   'Weekly Razorpay payouts — direct, no minimum threshold',
-                  'GST-compliant invoices generated automatically',
+                  'GST-ready invoicing with correct HSN and tax breakup',
                   'Pre-printed shipping labels (Delhivery · BlueDart · India Post)',
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-3 text-ink-900">

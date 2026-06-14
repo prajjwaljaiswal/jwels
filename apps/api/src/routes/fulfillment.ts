@@ -5,11 +5,70 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { decryptJson } from '../lib/crypto';
 import { getCarrier } from '../lib/carriers';
+import { sendOrderShippedEmail, sendOrderDeliveredEmail } from '../lib/email';
+import { sendWhatsApp } from '../lib/whatsapp';
 
 const router = Router();
 
 async function getVendor(userId: string) {
   return prisma.vendor.findUnique({ where: { userId } });
+}
+
+/** Best-effort "your order has shipped" email. Never throws. */
+async function notifyShipped(shipmentId: string): Promise<void> {
+  try {
+    const s = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+      include: {
+        orderItem: {
+          include: {
+            product: { select: { name: true } },
+            order: { select: { id: true, customer: { select: { email: true, name: true, phone: true } } } },
+          },
+        },
+      },
+    });
+    const customer = s?.orderItem?.order?.customer;
+    if (!customer?.email) return;
+    await sendOrderShippedEmail(customer.email, {
+      orderId: s!.orderItem.order.id,
+      customerName: customer.name || 'there',
+      productName: s!.orderItem.product?.name ?? 'Your item',
+      carrier: s!.carrierName,
+      trackingNumber: s!.awb,
+    });
+    if (customer.phone) {
+      void sendWhatsApp(customer.phone, `Your order #${s!.orderItem.order.id.slice(0, 8).toUpperCase()} has shipped via ${s!.carrierName}${s!.awb ? ` (AWB ${s!.awb})` : ''}. Track it in your account.`);
+    }
+  } catch (e: any) {
+    console.warn('[email] shipped notification failed:', e?.message);
+  }
+}
+
+/** Best-effort "delivered" notification. Never throws. */
+async function notifyDelivered(shipmentId: string): Promise<void> {
+  try {
+    const s = await prisma.shipment.findUnique({
+      where: { id: shipmentId },
+      include: {
+        orderItem: {
+          include: {
+            product: { select: { name: true } },
+            order: { select: { id: true, customer: { select: { email: true, name: true, phone: true } } } },
+          },
+        },
+      },
+    });
+    const customer = s?.orderItem?.order?.customer;
+    if (!customer?.email) return;
+    await sendOrderDeliveredEmail(customer.email, {
+      orderId: s!.orderItem.order.id,
+      customerName: customer.name || 'there',
+      productName: s!.orderItem.product?.name ?? 'Your item',
+    });
+  } catch (e: any) {
+    console.warn('[email] delivered notification failed:', e?.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -342,6 +401,10 @@ router.patch(
           ? [prisma.orderItem.update({ where: { id: shipment.orderItemId }, data: itemData })]
           : []),
       ]);
+
+      // Notify the customer on dispatch and delivery (best-effort).
+      if (newStatus === 'IN_TRANSIT') void notifyShipped(shipment.id);
+      else if (newStatus === 'DELIVERED') void notifyDelivered(shipment.id);
 
       res.json(updated);
     } catch (e) { next(e); }

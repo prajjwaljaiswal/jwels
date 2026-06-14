@@ -9,6 +9,7 @@ import { useVendor } from '@/lib/vendor-context';
 import { useCurrency, formatPrice } from '@/lib/currency';
 import { addressApi, type Address } from '@/lib/addresses';
 import { CheckoutStep } from '@/components/checkout/CheckoutStep';
+import { useCheckoutBlock } from '@/components/blocks/checkout/CheckoutContext';
 
 declare global {
   interface Window { Razorpay: any; }
@@ -71,6 +72,9 @@ export function LegacyVendorCheckoutPage() {
   const { code } = useCurrency();
   const { vendor, theme, basePath } = useVendor();
   const { items, setQty, remove, clear } = useCart();
+  // Optional gift-wrap toggle, supplied by the page-builder checkout block (null
+  // when the vendor uses the plain legacy checkout without that block).
+  const checkoutBlock = useCheckoutBlock();
   const [addr, setAddr] = useState({ name: '', line1: '', line2: '', city: '', state: '', pincode: '', phone: '' });
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | 'new'>('new');
@@ -396,6 +400,7 @@ export function LegacyVendorCheckoutPage() {
           shippingSelections: selectionsPayload(),
           ...(isPlatform ? {} : { paymentMethodId: selectedMethod.id }),
           couponCode: coupon?.code,
+          giftWrap: checkoutBlock?.giftWrap ?? false,
         }),
       });
 
@@ -444,6 +449,7 @@ export function LegacyVendorCheckoutPage() {
           shippingSelections: selectionsPayload(),
           ...(isPlatform ? {} : { paymentMethodId: selectedMethod.id }),
           couponCode: coupon?.code,
+          giftWrap: checkoutBlock?.giftWrap ?? false,
         }),
       });
 
@@ -454,6 +460,17 @@ export function LegacyVendorCheckoutPage() {
         order_id: checkout.razorpayOrderId,
         name: vendor.shopName,
         prefill: { name: addr.name, contact: addr.phone },
+        // Surface affordability options (EMI / no-cost EMI / Pay-Later) and UPI
+        // alongside the standard methods. Requires EMI/Pay-Later enabled on the
+        // Razorpay account and the order to meet amount minimums.
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+          emi: true,
+          paylater: true,
+        },
         handler: async (response: any) => {
           try {
             await api('/api/orders/verify-payment', {

@@ -560,12 +560,14 @@ router.get('/me/payouts', requireAuth, requireRole(Role.VENDOR), async (req, res
     include: {
       product: { select: { id: true, name: true, images: true } },
       order:   { select: { id: true, createdAt: true } },
+      payoutItem: { select: { id: true, payoutId: true } },
     },
     orderBy: { order: { createdAt: 'desc' } },
   });
 
-  let payable = 0;
-  let pipeline = 0;
+  let payable = 0;     // delivered, not yet settled
+  let settled = 0;     // delivered and already included in a payout
+  let pipeline = 0;    // paid/shipped, not yet delivered
   let lifetimeGross = 0;
   let lifetimeCommission = 0;
   const recent: any[] = [];
@@ -576,8 +578,12 @@ router.get('/me/payouts', requireAuth, requireRole(Role.VENDOR), async (req, res
     const payout = gross - commission;
     lifetimeGross += gross;
     lifetimeCommission += commission;
-    if (it.status === 'DELIVERED') payable += payout;
-    else pipeline += payout;
+    if (it.status === 'DELIVERED') {
+      if (it.payoutItem) settled += payout;
+      else payable += payout;
+    } else {
+      pipeline += payout;
+    }
     recent.push({
       orderItemId: it.id,
       orderId: it.orderId,
@@ -588,12 +594,21 @@ router.get('/me/payouts', requireAuth, requireRole(Role.VENDOR), async (req, res
       gross,
       commission,
       payout,
+      settled: !!it.payoutItem,
     });
   }
+
+  // Settlement history (the real payout ledger).
+  const settlements = await prisma.payout.findMany({
+    where: { vendorId: vendor.id },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
+  });
 
   res.json({
     commissionRate,
     payable,
+    settled,
     pipeline,
     lifetimeGross,
     lifetimeCommission,
@@ -604,6 +619,7 @@ router.get('/me/payouts', requireAuth, requireRole(Role.VENDOR), async (req, res
       ifsc: vendor.bankIfsc,
     },
     items: recent.slice(0, 100),
+    settlements,
   });
 });
 
