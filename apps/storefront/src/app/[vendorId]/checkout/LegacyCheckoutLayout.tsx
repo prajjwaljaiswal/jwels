@@ -484,6 +484,18 @@ export function LegacyVendorCheckoutPage() {
 
   function handlePlace() {
     if (!selectedMethod) { setErr('Select a payment method'); return; }
+    // Placing an order requires a logged-in customer (the API rejects an
+    // anonymous request with "Missing token"). Send guests to sign in and bring
+    // them back to checkout with the cart intact, rather than firing a request
+    // that fails with a cryptic 401.
+    if (!authed) {
+      const next = typeof window !== 'undefined'
+        ? window.location.pathname + window.location.search
+        : `${basePath}/checkout`;
+      toast.error('Please sign in to complete your order');
+      router.push(`/login?next=${encodeURIComponent(next)}`);
+      return;
+    }
     if (selectedMethod.provider === 'RAZORPAY') payOnline();
     else placeOffGateway();
   }
