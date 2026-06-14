@@ -11,7 +11,7 @@ import { useCurrency, formatPrice } from '@/lib/currency';
 export function LegacyVendorCartPage() {
   const router = useRouter();
   const { code } = useCurrency();
-  const { vendor, storeKey } = useVendor();
+  const { vendor, basePath } = useVendor();
   const { items, setQty, remove } = useCart();
   const addToWishlist = useWishlist((s) => s.add);
 
@@ -38,7 +38,7 @@ export function LegacyVendorCartPage() {
       <div className="max-w-6xl mx-auto px-5 py-16 text-center">
         <p className="font-display text-3xl mb-2">Your cart is empty</p>
         <p className="text-sm text-ink-700 mb-6">Find a piece you love from {vendor.shopName}.</p>
-        <Link href={`/${storeKey}/products`} className="btn-primary inline-flex">Browse {vendor.shopName}</Link>
+        <Link href={`${basePath}/products`} className="btn-primary inline-flex">Browse {vendor.shopName}</Link>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export function LegacyVendorCartPage() {
     <div className="max-w-6xl mx-auto px-5 py-8">
       <div className="flex items-baseline justify-between gap-4 mb-6">
         <h1 className="font-display text-3xl">Your cart</h1>
-        <Link href={`/${storeKey}/products`} className="text-sm hover:underline">Continue shopping →</Link>
+        <Link href={`${basePath}/products`} className="text-sm hover:underline">Continue shopping →</Link>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
@@ -62,7 +62,7 @@ export function LegacyVendorCartPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <Link href={`/${storeKey}/products/${i.productId}`} className="font-semibold line-clamp-2 hover:underline">
+                  <Link href={`${basePath}/products/${i.productId}`} className="font-semibold line-clamp-2 hover:underline">
                     {i.name}
                   </Link>
                   {i.variationLabel && <p className="text-xs text-ink-700 mt-0.5">{i.variationLabel}</p>}
@@ -112,7 +112,7 @@ export function LegacyVendorCartPage() {
             <span className="font-display text-2xl">{formatPrice(subtotal, code)}</span>
           </div>
 
-          <button onClick={() => router.push(`/${storeKey}/checkout`)} className="btn-primary w-full !py-3">
+          <button onClick={() => router.push(`${basePath}/checkout`)} className="btn-primary w-full !py-3">
             Proceed to checkout
           </button>
         </aside>

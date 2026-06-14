@@ -25,7 +25,7 @@ export default function VendorProductsPage() {
 interface Section { id: string; name: string; slug: string }
 
 function LegacyVendorProducts({ categorySlug }: { categorySlug?: string }) {
-  const { vendor, storeKey } = useVendor();
+  const { vendor, basePath } = useVendor();
   const [products, setProducts] = useState<ProductCardData[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,7 @@ function LegacyVendorProducts({ categorySlug }: { categorySlug?: string }) {
             ? (products.find((p: any) => p.category?.slug === categorySlug) as any)?.category?.name || categorySlug
             : 'Shop all'}
         </h1>
-        <Link href={`/${storeKey}`} className="text-sm hover:underline">← Back to shop</Link>
+        <Link href={(basePath || '/')} className="text-sm hover:underline">← Back to shop</Link>
       </div>
 
       <div className="flex gap-3 flex-wrap mb-6">

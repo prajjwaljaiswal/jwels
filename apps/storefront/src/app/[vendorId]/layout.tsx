@@ -156,15 +156,15 @@ function ThemedTokensCss() {
 
 function Header() {
   const pathname = usePathname();
-  const { vendor, themeConfig: t, theme, storeKey } = useVendor();
+  const { vendor, themeConfig: t, theme, storeKey, basePath } = useVendor();
   const items = useCart((s) => s.items);
   const cartCount = items
     .filter((i) => !i.vendorId || i.vendorId === vendor.id)
     .reduce((s, i) => s + i.quantity, 0);
-  const isStorefront = pathname === `/${storeKey}`;
+  const isStorefront = pathname === (basePath || '/');
   const navLinks = t.header.navLinks.length > 0
     ? t.header.navLinks
-    : [{ label: 'Shop', href: `/${storeKey}` }];
+    : [{ label: 'Shop', href: (basePath || '/') }];
 
   return (
     <header
@@ -181,7 +181,7 @@ function Header() {
       )}
       <div className="max-w-6xl mx-auto px-4 sm:px-5">
         <div className="h-16 flex items-center gap-3">
-          <Link href={`/${storeKey}`} className="flex items-center gap-3 min-w-0 shrink-0">
+          <Link href={(basePath || '/')} className="flex items-center gap-3 min-w-0 shrink-0">
             {vendor.shopLogoUrl ? (
               // Bare logo — no circle/rectangle wrapper. Height & max-width come from
               // the vendor's theme (set in the dashboard); width stays auto. Logo is
@@ -210,7 +210,7 @@ function Header() {
             <div className="hidden sm:flex flex-1 justify-center min-w-0">
               <SearchAutosuggest
                 vendorId={vendor.id}
-                searchBasePath={`/${storeKey}/products`}
+                searchBasePath={`${basePath}/products`}
                 placeholder={`Search ${vendor.shopName}…`}
                 className="w-full max-w-xl"
               />
@@ -229,9 +229,9 @@ function Header() {
 
           {/* Account + cart — pushed right on mobile (search lives on its own row) */}
           <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" style={{ color: t.colors.headerText }}>
-            <AccountMenu storeKey={storeKey} />
+            <AccountMenu storeKey={storeKey} basePath={basePath} />
             <Link
-              href={`/${storeKey}/cart`}
+              href={`${basePath}/cart`}
               className="relative h-10 w-10 rounded-full flex items-center justify-center border hover:opacity-80 transition-colors shrink-0"
               style={{ borderColor: 'rgba(0,0,0,0.15)' }}
               aria-label="Cart"
@@ -254,7 +254,7 @@ function Header() {
           <div className="sm:hidden pb-3 -mt-1">
             <SearchAutosuggest
               vendorId={vendor.id}
-              searchBasePath={`/${storeKey}/products`}
+              searchBasePath={`${basePath}/products`}
               placeholder={`Search ${vendor.shopName}…`}
               className="w-full"
             />
@@ -273,7 +273,7 @@ interface VendorCategory {
 }
 
 function CategoryNav() {
-  const { vendor, storeKey, themeConfig: t, theme } = useVendor();
+  const { vendor, basePath, themeConfig: t, theme } = useVendor();
   const [cats, setCats] = useState<VendorCategory[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -285,7 +285,7 @@ function CategoryNav() {
 
   if (!cats || cats.length === 0) return null;
 
-  const productsBase = `/${storeKey}/products`;
+  const productsBase = `${basePath}/products`;
 
   return (
     <nav

@@ -42,7 +42,7 @@ export default function VendorCartRoute() {
 
 function BlockRenderedCart({ blocks }: { blocks: any[] }) {
   const router = useRouter();
-  const { vendor, theme, storeKey } = useVendor();
+  const { vendor, theme, storeKey, basePath } = useVendor();
   const { items: allItems, setQty, remove } = useCart();
   const addToWishlist = useWishlist((s) => s.add);
 
@@ -60,7 +60,7 @@ function BlockRenderedCart({ blocks }: { blocks: any[] }) {
   }
 
   function proceedToCheckout() {
-    router.push(`/${storeKey}/checkout`);
+    router.push(`${basePath}/checkout`);
   }
 
   // Split the layout: announcement bar + line-items go in a main column, summary
@@ -91,7 +91,7 @@ function BlockRenderedCart({ blocks }: { blocks: any[] }) {
 
         <div className="flex items-baseline justify-between gap-4 mb-6">
           <h1 className="font-display text-3xl">Your cart</h1>
-          <Link href={`/${storeKey}/products`} className="text-sm hover:underline">Continue shopping →</Link>
+          <Link href={`${basePath}/products`} className="text-sm hover:underline">Continue shopping →</Link>
         </div>
 
         <div className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">

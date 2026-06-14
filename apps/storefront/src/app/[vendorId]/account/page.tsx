@@ -17,7 +17,7 @@ interface Me {
 
 export default function VendorAccountPage() {
   const router = useRouter();
-  const { vendor, theme, storeKey } = useVendor();
+  const { vendor, theme, basePath } = useVendor();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +32,7 @@ export default function VendorAccountPage() {
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    const next = `/${storeKey}/account`;
+    const next = `${basePath}/account`;
     if (!t) { router.replace(`/login?next=${encodeURIComponent(next)}`); return; }
     api<Me>('/api/auth/me', { silent: true })
       .then((u) => {
@@ -87,7 +87,7 @@ export default function VendorAccountPage() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
       <nav className="text-xs text-ink-500 mb-1">
-        <Link href={`/${storeKey}`} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
+        <Link href={(basePath || '/')} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
         <span className="mx-1.5">/</span>
         <span className="text-ink-900">My account</span>
       </nav>
@@ -145,13 +145,13 @@ export default function VendorAccountPage() {
       <section className="bg-surface border border-line rounded-md p-6 shadow-card">
         <h2 className="text-lg font-semibold text-ink-900 mb-3">Shortcuts</h2>
         <div className="flex flex-wrap gap-3">
-          <Link href={`/${storeKey}/orders`}
+          <Link href={`${basePath}/orders`}
             className="px-4 py-2 rounded-pill border font-semibold text-sm transition-colors hover:bg-canvas"
             style={{ borderColor: theme, color: theme }}
           >
             Orders from {vendor.shopName}
           </Link>
-          <Link href={`/${storeKey}`}
+          <Link href={(basePath || '/')}
             className="px-4 py-2 rounded-pill border font-semibold text-sm transition-colors hover:bg-canvas"
             style={{ borderColor: theme, color: theme }}
           >

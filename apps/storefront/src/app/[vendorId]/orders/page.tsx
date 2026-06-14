@@ -31,13 +31,13 @@ interface Order {
 export default function VendorOrdersPage() {
   const router = useRouter();
   const { code } = useCurrency();
-  const { vendor, theme, storeKey } = useVendor();
+  const { vendor, theme, basePath } = useVendor();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const t = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    const next = `/${storeKey}/orders`;
+    const next = `${basePath}/orders`;
     if (!t) { router.replace(`/login?next=${encodeURIComponent(next)}`); return; }
     api<Order[]>('/api/orders/me', { silent: true })
       .then((d) => { setOrders(d); setLoading(false); })
@@ -81,7 +81,7 @@ export default function VendorOrdersPage() {
         </div>
         <h1 className="text-2xl text-ink-900">No orders from {vendor.shopName} yet</h1>
         <p className="text-sm text-ink-500 mt-1.5">When you place an order with this shop, it'll show up here.</p>
-        <Link href={`/${storeKey}`}
+        <Link href={(basePath || '/')}
           className="inline-block mt-6 px-5 py-2.5 rounded-pill text-white font-semibold hover:opacity-90"
           style={{ background: theme }}
         >
@@ -94,7 +94,7 @@ export default function VendorOrdersPage() {
   return (
     <div className="max-w-5xl mx-auto px-6 py-10">
       <nav className="text-xs text-ink-500 mb-3">
-        <Link href={`/${storeKey}`} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
+        <Link href={(basePath || '/')} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
         <span className="mx-1.5">/</span>
         <span className="text-ink-900">My orders</span>
       </nav>
@@ -160,7 +160,7 @@ export default function VendorOrdersPage() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <Link href={`/${storeKey}/orders/${o.id}`}
+                  <Link href={`${basePath}/orders/${o.id}`}
                     className="px-4 py-2 rounded-pill border font-semibold text-sm transition-colors hover:bg-canvas"
                     style={{ borderColor: theme, color: theme }}
                   >

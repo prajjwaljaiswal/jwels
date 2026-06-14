@@ -12,7 +12,7 @@ export default function VendorWishlistPage() {
   const { vendorId } = useParams<{ vendorId: string }>();
   const router = useRouter();
   const { code } = useCurrency();
-  const { vendor, storeKey } = useVendor();
+  const { vendor, basePath } = useVendor();
   const hydrate = useWishlist((s) => s.hydrate);
   const remove = useWishlist((s) => s.remove);
   const allItems = useWishlist((s) => s.items);
@@ -68,7 +68,7 @@ export default function VendorWishlistPage() {
               ? `Tap the heart on any ${vendor.shopName} piece to save it for later.`
               : 'Tap the heart on any piece across the marketplace to save it.'}
           </p>
-          <Link href={`/${storeKey}/products`} className="btn-primary inline-flex">Browse {vendor.shopName}</Link>
+          <Link href={`${basePath}/products`} className="btn-primary inline-flex">Browse {vendor.shopName}</Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
@@ -77,7 +77,7 @@ export default function VendorWishlistPage() {
             const unavailable = !p.isActive || p.status !== 'ACTIVE' || p.stockQuantity <= 0;
             return (
               <div key={it.id} className="bg-surface border border-line rounded-md overflow-hidden flex flex-col">
-                <Link href={`/${storeKey}/products/${(p as any).slug || p.id}`} className="block relative aspect-square overflow-hidden bg-canvas">
+                <Link href={`${basePath}/products/${(p as any).slug || p.id}`} className="block relative aspect-square overflow-hidden bg-canvas">
                   {p.images[0] && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
@@ -89,7 +89,7 @@ export default function VendorWishlistPage() {
                   )}
                 </Link>
                 <div className="p-3 flex-1 flex flex-col">
-                  <Link href={`/${storeKey}/products/${(p as any).slug || p.id}`} className="text-sm line-clamp-2 hover:underline">{p.name}</Link>
+                  <Link href={`${basePath}/products/${(p as any).slug || p.id}`} className="text-sm line-clamp-2 hover:underline">{p.name}</Link>
                   <p className="text-xs text-ink-500 mt-0.5">{p.vendor.shopName}</p>
                   <p className="font-display text-lg mt-1">{formatPrice(p.price, code)}</p>
                   <div className="mt-3 flex gap-2">

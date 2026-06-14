@@ -21,7 +21,7 @@ function PersonIcon() {
   );
 }
 
-export function AccountMenu({ storeKey: forcedKey }: { storeKey?: string } = {}) {
+export function AccountMenu({ storeKey: forcedKey, basePath }: { storeKey?: string; basePath?: string } = {}) {
   const isStorefront = !!forcedKey;
   const router = useRouter();
   const pathname = usePathname() || '';
@@ -36,10 +36,14 @@ export function AccountMenu({ storeKey: forcedKey }: { storeKey?: string } = {})
     () => forcedKey ? [null, forcedKey] : pathname.match(/^\/store\/([^/]+)/),
     [forcedKey, pathname],
   );
-  const accountHref   = storeMatch ? `/${storeMatch[1]}/account`   : '/account';
-  const ordersHref    = storeMatch ? `/${storeMatch[1]}/orders`    : '/orders';
-  const wishlistHref  = storeMatch ? `/${storeMatch[1]}/wishlist`  : '/account/wishlist';
-  const addressesHref = storeMatch ? `/${storeMatch[1]}/addresses` : '/account/addresses';
+  // Link prefix. In the storefront app `basePath` is "" on a custom domain (clean
+  // URLs) and "/<slug>" on localhost / the shared app domain; fall back to the
+  // slug for the marketplace-web usage that has no basePath.
+  const storeBase = forcedKey ? (basePath ?? `/${forcedKey}`) : (storeMatch ? `/${storeMatch[1]}` : '');
+  const accountHref   = storeMatch ? `${storeBase}/account`   : '/account';
+  const ordersHref    = storeMatch ? `${storeBase}/orders`    : '/orders';
+  const wishlistHref  = storeMatch ? `${storeBase}/wishlist`  : '/account/wishlist';
+  const addressesHref = storeMatch ? `${storeBase}/addresses` : '/account/addresses';
   const loginHref     = storeMatch ? `/login?next=${encodeURIComponent(pathname)}` : '/login';
   const registerHref  = storeMatch ? `/register?next=${encodeURIComponent(pathname)}` : '/register';
 

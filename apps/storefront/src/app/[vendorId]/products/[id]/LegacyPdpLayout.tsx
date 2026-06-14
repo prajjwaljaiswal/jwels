@@ -119,7 +119,7 @@ function RatingBar({ star, count, total }: { star: number; count: number; total:
 export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: string; id: string } }) {
   const router = useRouter();
   const { code } = useCurrency();
-  const { vendor, theme, storeKey, themeConfig } = useVendor();
+  const { vendor, theme, basePath, themeConfig } = useVendor();
   const t = themeConfig;
   const [product, setProduct] = useState<Product | null>(null);
   const [qty, setQty] = useState(1);
@@ -221,7 +221,7 @@ export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: 
       qty,
     );
     if (!ok) return;
-    if (buyNow) router.push(`/${storeKey}/checkout`);
+    if (buyNow) router.push(`${basePath}/checkout`);
     else toast.success(`${product.name} added to cart`);
   }
 
@@ -257,7 +257,7 @@ export function LegacyVendorProductDetailPage({ params }: { params: { vendorId: 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8" style={{ color: t.colors.text }}>
       <nav className="text-xs text-ink-500 mb-5">
-        <Link href={`/${storeKey}`} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
+        <Link href={(basePath || '/')} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
         <span className="mx-1.5">/</span>
         <span className="text-ink-700">{product.category.name}</span>
         <span className="mx-1.5">/</span>

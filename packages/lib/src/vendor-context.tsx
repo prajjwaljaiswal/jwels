@@ -1,5 +1,5 @@
 'use client';
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 export type SocialPlatform =
   | 'instagram' | 'facebook' | 'twitter' | 'youtube'
@@ -67,6 +67,32 @@ interface VendorContextValue {
   theme: string;          // legacy primary color shortcut
   themeConfig: VendorTheme;
   storeKey: string;       // slug ?? id — used to build canonical SEO URLs
+  basePath: string;       // link prefix: "" on a custom domain, "/<storeKey>" on the shared app domain / localhost
+}
+
+/**
+ * Resolves the path prefix to use when building in-store links.
+ *
+ *  - On a custom vendor domain (e.g. jhumkaya.com) the storefront middleware
+ *    rewrites "/x" → "/<slug>/x", so links must be slug-LESS ("" prefix) to keep
+ *    the address bar clean — jhumkaya.com/product-slug, not jhumkaya.com/jhumkaya/product-slug.
+ *  - On localhost or the shared app domain (store.vrindaonline.com) vendors are
+ *    reached path-first, so links keep the "/<slug>" prefix.
+ *
+ * SSR and the first client render both return the path-based form (matching the
+ * server-rendered HTML) to avoid a hydration mismatch; on a custom domain it then
+ * flips to the clean form right after mount, before any link is clicked.
+ */
+export function useStoreBasePath(storeKey: string): string {
+  const [basePath, setBasePath] = useState(`/${storeKey}`);
+  useEffect(() => {
+    const host = window.location.hostname;
+    const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'localhost';
+    const pathBased =
+      host === appDomain || host === 'localhost' || host.endsWith('.localhost');
+    setBasePath(pathBased ? `/${storeKey}` : '');
+  }, [storeKey]);
+  return basePath;
 }
 
 export function defaultTheme(primary = '#F1641E'): VendorTheme {
@@ -128,8 +154,9 @@ export function VendorProvider({ vendor, children }: { vendor: VendorBrand; chil
   const theme = vendor.themeColor ?? '#F1641E';
   const themeConfig = useMemo(() => mergeTheme(theme, vendor.theme), [theme, vendor.theme]);
   const storeKey = vendor.slug || vendor.id;
+  const basePath = useStoreBasePath(storeKey);
   return (
-    <VendorContext.Provider value={{ vendor, theme, themeConfig, storeKey }}>
+    <VendorContext.Provider value={{ vendor, theme, themeConfig, storeKey, basePath }}>
       {children}
     </VendorContext.Provider>
   );

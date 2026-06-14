@@ -67,7 +67,7 @@ function BlockRenderedPdp({
   blocks: any[];
 }) {
   const router = useRouter();
-  const { vendor, theme, themeConfig, storeKey } = useVendor();
+  const { vendor, theme, themeConfig, storeKey, basePath } = useVendor();
   const reveal = useStoreReveal();
   const [product, setProduct] = useState<PdpProduct | null>(null);
   const [reviewsData, setReviewsData] = useState<PdpReviewsData | null>(null);
@@ -138,7 +138,7 @@ function BlockRenderedPdp({
       qty,
     );
     if (!ok) return;
-    if (buyNow) router.push(`/${storeKey}/checkout`);
+    if (buyNow) router.push(`${basePath}/checkout`);
     else toast.success(`${product.name} added to cart`);
   }
 
@@ -167,7 +167,7 @@ function BlockRenderedPdp({
     >
       <div className="max-w-6xl mx-auto px-6 py-8">
         <nav className="text-xs text-ink-500 mb-5">
-          <Link href={`/${storeKey}`} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
+          <Link href={(basePath || '/')} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
           <span className="mx-1.5">/</span>
           <span className="text-ink-700">{product.category.name}</span>
           <span className="mx-1.5">/</span>

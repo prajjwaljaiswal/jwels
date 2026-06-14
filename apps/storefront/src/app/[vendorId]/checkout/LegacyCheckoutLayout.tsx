@@ -69,7 +69,7 @@ function methodSubtitle(m: VendorPaymentMethod): string {
 export function LegacyVendorCheckoutPage() {
   const router = useRouter();
   const { code } = useCurrency();
-  const { vendor, theme, storeKey } = useVendor();
+  const { vendor, theme, basePath } = useVendor();
   const { items, setQty, remove, clear } = useCart();
   const [addr, setAddr] = useState({ name: '', line1: '', line2: '', city: '', state: '', pincode: '', phone: '' });
   const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
@@ -409,7 +409,7 @@ export function LegacyVendorCheckoutPage() {
 
       toast.success('Order placed!');
       clearVendorItems();
-      router.push(`/${storeKey}/orders`);
+      router.push(`${basePath}/orders`);
     } catch (e: any) {
       setErr(e.message);
       setLoading(false);
@@ -467,7 +467,7 @@ export function LegacyVendorCheckoutPage() {
             });
             toast.success('Payment successful — order confirmed!');
             clearVendorItems();
-            router.push(`/${storeKey}/orders`);
+            router.push(`${basePath}/orders`);
           } catch (e: any) {
             setErr(`Payment verification failed: ${e.message}`);
           }
@@ -504,7 +504,7 @@ export function LegacyVendorCheckoutPage() {
           <h1 className="font-display text-3xl text-ink-900 mb-2">Your cart is empty</h1>
           <p className="text-ink-700 mb-6">Add something from {vendor.shopName} to get started.</p>
           <Link
-            href={`/${storeKey}`}
+            href={(basePath || '/')}
             className="inline-block px-5 py-2.5 rounded-pill text-white font-semibold hover:opacity-90"
             style={{ background: theme }}
           >
@@ -518,7 +518,7 @@ export function LegacyVendorCheckoutPage() {
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
       <nav className="text-xs text-ink-500 mb-4">
-        <Link href={`/${storeKey}`} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
+        <Link href={(basePath || '/')} className="hover:opacity-70" style={{ color: theme }}>{vendor.shopName}</Link>
         <span className="mx-1.5">/</span>
         <span className="text-ink-900">Checkout</span>
       </nav>
@@ -539,7 +539,7 @@ export function LegacyVendorCheckoutPage() {
           <section className="bg-surface border border-line rounded-md shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-line flex items-center justify-between">
               <h2 className="font-semibold text-ink-900">Your cart</h2>
-              <Link href={`/${storeKey}`} className="text-sm hover:underline" style={{ color: theme }}>Continue shopping</Link>
+              <Link href={(basePath || '/')} className="text-sm hover:underline" style={{ color: theme }}>Continue shopping</Link>
             </div>
             <ul className="divide-y divide-line">
               {vendorItems.map((i) => (
@@ -588,7 +588,7 @@ export function LegacyVendorCheckoutPage() {
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs text-ink-500">We'll use this to deliver your order and send tracking updates.</p>
               {savedAddresses.length > 0 && (
-                <Link href={`/${storeKey}/addresses`} className="text-xs hover:underline" style={{ color: theme }}>Manage</Link>
+                <Link href={`${basePath}/addresses`} className="text-xs hover:underline" style={{ color: theme }}>Manage</Link>
               )}
             </div>
             {savedAddresses.length > 0 && (
@@ -984,7 +984,7 @@ export function LegacyVendorCheckoutPage() {
       </div>
 
       {paymentInstructions && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => router.push(`/${storeKey}/orders`)}>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => router.push(`${basePath}/orders`)}>
           <div className="bg-surface max-w-md w-full rounded-md shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-display text-xl text-ink-900 mb-1">Order placed</h3>
             <p className="text-sm text-ink-700 mb-4">
@@ -1011,7 +1011,7 @@ export function LegacyVendorCheckoutPage() {
               )}
             </div>
             <button
-              onClick={() => router.push(`/${storeKey}/orders`)}
+              onClick={() => router.push(`${basePath}/orders`)}
               className="mt-5 w-full py-3 rounded-pill text-white font-semibold"
               style={{ background: theme }}
             >

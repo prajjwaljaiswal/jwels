@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { WishlistButton } from '@/components/WishlistButton';
 import { useCurrency, formatPrice } from '@/lib/currency';
+import { useStoreBasePath } from '@/lib/vendor-context';
 
 export interface ProductCardData {
   id: string;
@@ -36,12 +37,14 @@ export function ProductCard({ product }: { product: ProductCardData }) {
   const hasVariationRange = comboPrices.length > 0 && minPrice !== maxPrice;
   const displayPrice = hasVariationRange ? minPrice : Number(product.price);
 
-  // Relative path only — the storefront serves one vendor per domain and the
-  // middleware rewrites paths transparently, so we must NOT prepend an absolute
-  // base URL (doing so navigated production users off their custom domain onto
-  // NEXT_PUBLIC_STOREFRONT_URL).
+  // Domain-aware link. On a custom vendor domain the base is "" so the URL stays
+  // clean (jhumkaya.com/product-slug); on localhost / the shared app domain it is
+  // "/<slug>" (localhost:3003/jhumkaya/product-slug). The storefront middleware
+  // rewrites the clean form back to the slug-prefixed route. Never prepend an
+  // absolute base URL — that navigated production users off their custom domain.
+  const base = useStoreBasePath(product.vendor.slug ?? '');
   const productHref = product.vendor.slug && product.slug
-    ? `/${product.vendor.slug}/${product.slug}`
+    ? `${base}/${product.slug}`
     : `/products/${product.id}`;
 
   const img0 = product.images[0];
