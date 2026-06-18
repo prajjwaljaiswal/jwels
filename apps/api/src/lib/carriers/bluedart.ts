@@ -41,7 +41,7 @@ async function getToken(creds: BlueDartCreds): Promise<string> {
       APIVersion: '1.3',
     }),
   });
-  const data = await res.json().catch(() => ({}));
+  const data: any = await res.json().catch(() => ({}));
   if (!data?.IsSuccess || !data?.JWTToken) {
     throw new Error(data?.Reason ?? `Blue Dart auth failed (HTTP ${res.status})`);
   }
@@ -71,7 +71,10 @@ export const bluedart: CarrierAdapter = {
       label: 'License Key',
       type: 'secret',
       required: true,
-      isDefault: true,
+      // Secret (NOT isDefault): must live in the encrypted credentials blob, which
+      // is where verify()/track() read it via ctx.credentials. Routing it to the
+      // plaintext defaultsJson left ctx.credentials.licenseKey undefined, so auth
+      // always failed and the carrier was unusable.
       helpText: 'License key from Blue Dart API Gateway — used as clientid in every request.',
     },
     {
@@ -129,7 +132,7 @@ export const bluedart: CarrierAdapter = {
     });
 
     if (!res.ok) return [];
-    const data = await res.json().catch(() => ({}));
+    const data: any = await res.json().catch(() => ({}));
 
     const scans: any[] = data?.ShipmentData?.[0]?.Shipment?.Scans ?? [];
     return scans.map((s: any): TrackingEvent => {

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { Role, OrderStatus, ShipmentStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
@@ -702,17 +703,56 @@ router.get('/tracking/:awb', requireAuth, requireRole(Role.VENDOR), async (req, 
 // POST /api/fulfillment/carrier/webhook  (carrier push events)
 // ─────────────────────────────────────────────────────────────────────────────
 
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  // Length check first; timingSafeEqual throws on length mismatch.
+  return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
+
+// Authenticate a carrier push. Secret comes from CARRIER_WEBHOOK_SECRET and may be
+// sent via the x-webhook-secret header or a ?secret= query param (some carrier
+// portals only allow configuring a URL). Returns an HTTP status to respond with,
+// or null when authorized. If the secret is not configured the endpoint is
+// disabled (503) rather than accepting unauthenticated writes.
+function authorizeWebhook(req: any): { status: number; error: string } | null {
+  const expected = process.env.CARRIER_WEBHOOK_SECRET;
+  if (!expected) return { status: 503, error: 'Carrier webhook is not configured' };
+  const provided =
+    (req.headers['x-webhook-secret'] as string | undefined) ??
+    (typeof req.query?.secret === 'string' ? (req.query.secret as string) : undefined);
+  if (!provided || !safeEqual(provided, expected)) {
+    return { status: 401, error: 'Invalid or missing webhook secret' };
+  }
+  return null;
+}
+
+const webhookSchema = z.object({
+  awb: z.string().min(1),
+  events: z.array(z.object({
+    name:        z.string().min(1),
+    description: z.string().optional(),
+    time:        z.string().optional(),
+    location:    z.string().optional(),
+  })).min(1),
+});
+
+// Pre-transit shipment statuses that a live "in transit" event may fast-forward.
+const PRE_TRANSIT: ShipmentStatus[] = [
+  ShipmentStatus.LABEL_GENERATED,
+  ShipmentStatus.MANIFEST_GENERATED,
+  ShipmentStatus.PICKUP_SCHEDULED,
+  ShipmentStatus.PICKED_UP,
+];
+
 router.post('/carrier/webhook', async (req, res, next) => {
   try {
-    const carrierName = (req.headers['x-carrier-name'] as string | undefined)?.toUpperCase();
-    const { awb, events } = req.body as {
-      awb: string;
-      events: Array<{ name: string; description?: string; time: string; location?: string }>;
-    };
+    const denied = authorizeWebhook(req);
+    if (denied) return res.status(denied.status).json({ error: denied.error });
 
-    if (!awb || !Array.isArray(events)) {
-      return res.status(400).json({ error: 'awb and events[] required' });
-    }
+    const parsed = webhookSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const { awb, events } = parsed.data;
 
     const shipment = await prisma.shipment.findFirst({ where: { awb } });
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
@@ -722,14 +762,33 @@ router.post('/carrier/webhook', async (req, res, next) => {
         shipmentId:       shipment.id,
         eventName:        e.name,
         eventDescription: e.description,
-        eventTime:        new Date(e.time),
+        eventTime:        e.time && !Number.isNaN(Date.parse(e.time)) ? new Date(e.time) : new Date(),
         eventLocation:    e.location,
         rawPayload:       req.body,
       })),
       skipDuplicates: true,
     });
 
-    res.json({ received: created.count });
+    // Advance order/shipment status from the events so a real carrier push closes
+    // the order, feeds payouts, and notifies the customer (via the shared helpers).
+    const text = events.map((e) => `${e.name} ${e.description ?? ''}`).join(' ').toLowerCase();
+    let transition: 'delivered' | 'rto' | 'shipped' | null = null;
+    if (/deliver/.test(text)) transition = 'delivered';
+    else if (/\brto\b|return to origin|undelivered|returned/.test(text)) transition = 'rto';
+    else if (/out for delivery|in[\s-]?transit|dispatch|shipped|picked[\s-]?up/.test(text)) transition = 'shipped';
+
+    if (transition === 'delivered') {
+      await markItemDelivered(shipment.orderItemId); // also drives the shipment to DELIVERED
+    } else if (transition === 'shipped') {
+      if (PRE_TRANSIT.includes(shipment.status)) {
+        await prisma.shipment.update({ where: { id: shipment.id }, data: { status: ShipmentStatus.IN_TRANSIT } });
+      }
+      await markItemShipped(shipment.orderItemId);
+    } else if (transition === 'rto' && shipment.status !== ShipmentStatus.RTO_DELIVERED && shipment.status !== ShipmentStatus.CANCELLED) {
+      await prisma.shipment.update({ where: { id: shipment.id }, data: { status: ShipmentStatus.RTO_INITIATED } });
+    }
+
+    res.json({ received: created.count, transition });
   } catch (e) { next(e); }
 });
 

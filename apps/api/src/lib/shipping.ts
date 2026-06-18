@@ -1,6 +1,7 @@
 import { ShippingMethod, VendorCarrierAccount } from '@prisma/client';
 import { decryptJson } from './crypto';
 import { getCarrier, RateQuote } from './carriers';
+import { canonicalState } from './states';
 
 export interface QuoteItem {
   productId: string;
@@ -79,9 +80,13 @@ function zoneMatches(method: ShippingMethod, destState: string | null): boolean 
   if (!method.zones || method.zones.length === 0) return true;
   if (method.zones.includes('*')) return true;
   if (!destState) return true; // can't filter without info — be permissive
-  // Zones are stored like "IN-DL"; match by the suffix or full code.
-  const code = destState.toUpperCase();
-  return method.zones.some((z) => z.toUpperCase().endsWith(code));
+  // Both sides are resolved to a canonical 2-letter state code so a vendor's
+  // zone list ("DL", "IN-DL", or "Delhi") matches the customer's free-text state
+  // ("Delhi"). The previous endsWith() compared "DL" against "DELHI" and never
+  // matched, silently hiding every zone-restricted method.
+  const dest = canonicalState(destState);
+  if (!dest) return true;
+  return method.zones.some((z) => canonicalState(z) === dest);
 }
 
 async function fetchLiveQuotes(
