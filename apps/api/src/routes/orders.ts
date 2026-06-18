@@ -8,6 +8,7 @@ import { checkoutLimiter } from '../middleware/rateLimit';
 import { razorpay, razorpayClient, verifyPaymentSignature } from '../lib/razorpay';
 import { decryptJson } from '../lib/crypto';
 import { priceSelection, isSystemDefaultMethodId, priceSystemDefault } from '../lib/shipping';
+import { markItemShipped, markItemDelivered } from '../lib/fulfillmentSync';
 import { resolveCoupon, couponRedemptionOps } from '../lib/coupon';
 import { uploadBuffer } from '../lib/cloudinary';
 import { confirmOrderPaid, notifyOrderConfirmation } from '../lib/orderConfirm';
@@ -755,22 +756,18 @@ router.patch(
 
     const { status, trackingNumber, courierName, trackingUrl, waybillUrl } = parsed.data;
 
-    const updateData: Record<string, unknown> = { status: status as OrderStatus };
+    // Funnel SHIPPED/DELIVERED through the shared transition helpers so the
+    // customer notification fires and any linked Shipment stays in sync —
+    // regardless of which dispatch entry point the vendor used.
     if (status === 'SHIPPED') {
-      updateData.dispatchedAt = new Date();
-      if (trackingNumber) updateData.trackingNumber = trackingNumber;
-      if (courierName)    updateData.shippingCarrier = courierName;
-      if (trackingUrl)    updateData.trackingUrl = trackingUrl;
-      if (waybillUrl)     updateData.waybillUrl = waybillUrl;
-    }
-    if (status === 'DELIVERED') {
-      updateData.deliveredAt = new Date();
+      await markItemShipped(item.id, { trackingNumber, courierName, trackingUrl, waybillUrl });
+    } else if (status === 'DELIVERED') {
+      await markItemDelivered(item.id);
+    } else {
+      await prisma.orderItem.update({ where: { id: item.id }, data: { status: status as OrderStatus } });
     }
 
-    const updated = await prisma.orderItem.update({
-      where: { id: item.id },
-      data: updateData,
-    });
+    const updated = await prisma.orderItem.findUnique({ where: { id: item.id } });
     res.json(updated);
   }
 );

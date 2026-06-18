@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from '../middleware/auth';
 import { encryptJson, decryptJson, maskSecret } from '../lib/crypto';
 import { getCarrier, listCarriers } from '../lib/carriers';
 import { quoteVendorGroups } from '../lib/shipping';
+import { markItemShipped } from '../lib/fulfillmentSync';
 
 const router = Router();
 
@@ -567,15 +568,17 @@ router.post(
         }
       }
 
-      const updated = await prisma.orderItem.update({
-        where: { id: item.id },
-        data: {
-          status: OrderStatus.SHIPPED,
-          trackingNumber,
-          trackingUrl,
-          labelUrl,
-        },
+      // Route through the shared transition: stamps dispatchedAt (so the
+      // auto-deliver / payout pipeline can later close the item), records the
+      // tracking fields, and fires the shipped notification. Previously this path
+      // set status=SHIPPED but no dispatchedAt and created no Shipment, so such
+      // items fell through every auto-deliver branch and never got paid out.
+      await markItemShipped(item.id, {
+        trackingNumber: trackingNumber ?? undefined,
+        trackingUrl: trackingUrl ?? undefined,
+        labelUrl: labelUrl ?? undefined,
       });
+      const updated = await prisma.orderItem.findUnique({ where: { id: item.id } });
       res.json(updated);
     } catch (e) { next(e); }
   },

@@ -5,8 +5,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { decryptJson } from '../lib/crypto';
 import { getCarrier } from '../lib/carriers';
-import { sendOrderShippedEmail, sendOrderDeliveredEmail } from '../lib/email';
-import { sendWhatsApp } from '../lib/whatsapp';
+import { markItemShipped, markItemDelivered } from '../lib/fulfillmentSync';
 
 const router = Router();
 
@@ -14,62 +13,9 @@ async function getVendor(userId: string) {
   return prisma.vendor.findUnique({ where: { userId } });
 }
 
-/** Best-effort "your order has shipped" email. Never throws. */
-async function notifyShipped(shipmentId: string): Promise<void> {
-  try {
-    const s = await prisma.shipment.findUnique({
-      where: { id: shipmentId },
-      include: {
-        orderItem: {
-          include: {
-            product: { select: { name: true } },
-            order: { select: { id: true, customer: { select: { email: true, name: true, phone: true } } } },
-          },
-        },
-      },
-    });
-    const customer = s?.orderItem?.order?.customer;
-    if (!customer?.email) return;
-    await sendOrderShippedEmail(customer.email, {
-      orderId: s!.orderItem.order.id,
-      customerName: customer.name || 'there',
-      productName: s!.orderItem.product?.name ?? 'Your item',
-      carrier: s!.carrierName,
-      trackingNumber: s!.awb,
-    });
-    if (customer.phone) {
-      void sendWhatsApp(customer.phone, `Your order #${s!.orderItem.order.id.slice(0, 8).toUpperCase()} has shipped via ${s!.carrierName}${s!.awb ? ` (AWB ${s!.awb})` : ''}. Track it in your account.`);
-    }
-  } catch (e: any) {
-    console.warn('[email] shipped notification failed:', e?.message);
-  }
-}
-
-/** Best-effort "delivered" notification. Never throws. */
-async function notifyDelivered(shipmentId: string): Promise<void> {
-  try {
-    const s = await prisma.shipment.findUnique({
-      where: { id: shipmentId },
-      include: {
-        orderItem: {
-          include: {
-            product: { select: { name: true } },
-            order: { select: { id: true, customer: { select: { email: true, name: true, phone: true } } } },
-          },
-        },
-      },
-    });
-    const customer = s?.orderItem?.order?.customer;
-    if (!customer?.email) return;
-    await sendOrderDeliveredEmail(customer.email, {
-      orderId: s!.orderItem.order.id,
-      customerName: customer.name || 'there',
-      productName: s!.orderItem.product?.name ?? 'Your item',
-    });
-  } catch (e: any) {
-    console.warn('[email] delivered notification failed:', e?.message);
-  }
-}
+// Customer shipped/delivered notifications and the OrderItem ⇄ Shipment status
+// sync now live in ../lib/fulfillmentSync (markItemShipped / markItemDelivered),
+// shared across every dispatch path so the customer is notified exactly once.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status transition whitelist
@@ -219,6 +165,12 @@ router.post(
           declaredValue: Number(item.priceAtPurchase) * item.quantity,
         },
       });
+
+      // Generating the label/AWB is the dispatch action in this flow: advance the
+      // order item to SHIPPED so the customer sees progress, the payout pipeline
+      // picks it up, and the shipped notification fires. The shipment itself stays
+      // at LABEL_GENERATED so it remains eligible for the manifest/pickup workflow.
+      await markItemShipped(item.id);
 
       res.status(201).json(shipment);
     } catch (e) { next(e); }
@@ -378,33 +330,28 @@ router.patch(
         });
       }
 
-      const now = new Date();
       const newStatus = parsed.data.status;
 
-      // Determine OrderItem sync
-      let itemData: Record<string, unknown> | null = null;
+      // Update the shipment first, then sync the order item through the shared
+      // transition helpers. They are the single notification source and are
+      // idempotent, so no duplicate "shipped" email fires if the item was already
+      // dispatched via another path (e.g. label generation).
+      const updated = await prisma.shipment.update({
+        where: { id: shipment.id },
+        data: { status: newStatus },
+        include: { trackingEvents: { orderBy: { eventTime: 'desc' } } },
+      });
+
       if (newStatus === 'IN_TRANSIT') {
-        itemData = { status: OrderStatus.SHIPPED, dispatchedAt: now };
+        await markItemShipped(shipment.orderItemId);
       } else if (newStatus === 'DELIVERED') {
-        itemData = { status: OrderStatus.DELIVERED, deliveredAt: now };
-      } else if (newStatus === 'RTO_DELIVERED' || (newStatus === 'CANCELLED' && !['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'].includes(shipment.status))) {
-        itemData = { status: OrderStatus.CANCELLED };
+        await markItemDelivered(shipment.orderItemId);
+      } else if (
+        newStatus === 'RTO_DELIVERED' ||
+        (newStatus === 'CANCELLED' && !['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'].includes(shipment.status))
+      ) {
+        await prisma.orderItem.update({ where: { id: shipment.orderItemId }, data: { status: OrderStatus.CANCELLED } });
       }
-
-      const [updated] = await prisma.$transaction([
-        prisma.shipment.update({
-          where: { id: shipment.id },
-          data: { status: newStatus },
-          include: { trackingEvents: { orderBy: { eventTime: 'desc' } } },
-        }),
-        ...(itemData
-          ? [prisma.orderItem.update({ where: { id: shipment.orderItemId }, data: itemData })]
-          : []),
-      ]);
-
-      // Notify the customer on dispatch and delivery (best-effort).
-      if (newStatus === 'IN_TRANSIT') void notifyShipped(shipment.id);
-      else if (newStatus === 'DELIVERED') void notifyDelivered(shipment.id);
 
       res.json(updated);
     } catch (e) { next(e); }
