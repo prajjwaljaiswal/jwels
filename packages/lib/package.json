@@ -8,6 +8,9 @@
     ".": "./src/index.ts",
     "./*": "./src/*.ts"
   },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
+  },
   "peerDependencies": {
     "next": "*",
     "react": "*",

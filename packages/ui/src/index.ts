@@ -23,6 +23,10 @@ export * from './dashboard/DashboardShell';
 export * from './dashboard/ProfileMenu';
 export * from './dashboard/CurrencySelector';
 
+// Support module — reusable realtime chat thread + notification bell
+export * from './support/SupportThread';
+export * from './support/NotificationBell';
+
 // Landing
 export * from './landing/Counter';
 export * from './landing/CursorSpotlight';

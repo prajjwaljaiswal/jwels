@@ -450,6 +450,12 @@ export function ProductDetailView({ productId }: { productId: string }) {
             <button onClick={() => addToCart(false)} disabled={!inStock} className="btn-primary w-full">Add to cart</button>
             <button onClick={() => addToCart(true)} disabled={!inStock} className="btn-secondary w-full">Buy it now</button>
             <WishlistButton productId={product.id} variant="pill" className="w-full justify-center" />
+            <Link
+              href={`/account/support/new?vendor=${product.vendor.id}&product=${product.id}`}
+              className="block text-center text-sm text-ink-500 hover:text-brand-700 underline underline-offset-2 pt-1"
+            >
+              Contact seller
+            </Link>
           </div>
 
           <DeliveryEstimator productId={product.id} />

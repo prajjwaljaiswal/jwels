@@ -35,6 +35,13 @@ export const PERMISSIONS = [
   'NOTIFICATION_MANAGE',
   'SHIPMENT_VIEW',
   'INVOICE_VIEW',
+  // Marketing hub (catalog feeds, connections, tracking) and ad spend
+  'MARKETING_VIEW',
+  'MARKETING_MANAGE',
+  'MARKETING_ADS_MANAGE',
+  // Support module (tickets + realtime chat)
+  'SUPPORT_VIEW',
+  'SUPPORT_MANAGE',
 ] as const;
 
 export type Permission = typeof PERMISSIONS[number];

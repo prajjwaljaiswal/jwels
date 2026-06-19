@@ -43,3 +43,11 @@ export const couponLimiter = rateLimit({
   limit: isProd ? 30 : 300,
   message: { error: 'Too many coupon attempts. Please try again later.' },
 });
+
+/** Public product feed (Meta/Google crawlers fetch a few times a day) — generous but bounded. */
+export const feedLimiter = rateLimit({
+  ...base,
+  windowMs: 5 * 60 * 1000,
+  limit: isProd ? 60 : 600,
+  message: { error: 'Too many feed requests. Please slow down.' },
+});

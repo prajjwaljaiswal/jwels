@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useCart } from '@/lib/cart';
 import { AccountMenu } from './AccountMenu';
+import { NotificationBell } from '@/components/support/NotificationBell';
 import { SearchAutosuggest } from '@/components/search/SearchAutosuggest';
 import { MegaMenu } from './MegaMenu';
 import { Logo } from '@/components/brand/Logo';
@@ -58,6 +59,7 @@ export function Header() {
         )}
 
         <nav className="hidden md:flex items-center gap-5 text-sm">
+          <NotificationBell />
           <AccountMenu />
           <Link href="/vendor" className="hover:text-brand-700">Sell</Link>
           <Link href="/cart" className="relative inline-flex items-center" aria-label="Cart">

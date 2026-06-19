@@ -79,7 +79,7 @@ export default function VendorPayoutsPage() {
             <p className="text-sm font-semibold text-ink-900">No bank account on file</p>
             <p className="text-sm text-ink-700 mt-0.5">Add your bank details to receive payouts.</p>
           </div>
-          <Link href="/sell/onboard" className="btn-primary text-sm">Add bank</Link>
+          <Link href="/settings?tab=bank" className="btn-primary text-sm">Add bank</Link>
         </div>
       )}
 
@@ -114,7 +114,7 @@ export default function VendorPayoutsPage() {
                 {data.bank.accountNumber} · {data.bank.ifsc ?? '—'}
               </p>
             </div>
-            <Link href="/sell/onboard" className="btn-secondary text-sm">Update</Link>
+            <Link href="/settings?tab=bank" className="btn-secondary text-sm">Update</Link>
           </div>
         </Card>
       )}

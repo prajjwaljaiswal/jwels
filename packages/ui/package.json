@@ -9,18 +9,21 @@
     "./*": "./src/*"
   },
   "peerDependencies": {
-    "next": "*",
-    "react": "*",
-    "react-dom": "*",
     "@dnd-kit/core": "*",
     "@dnd-kit/sortable": "*",
     "@dnd-kit/utilities": "*",
-    "zustand": "^4.5.5",
+    "algoliasearch": "*",
+    "isomorphic-dompurify": "*",
+    "nanoid": "*",
+    "next": "*",
+    "react": "*",
+    "react-dom": "*",
     "react-hot-toast": "*",
     "react-instantsearch": "*",
     "react-instantsearch-nextjs": "*",
-    "algoliasearch": "*",
-    "nanoid": "*",
-    "isomorphic-dompurify": "*"
+    "zustand": "^4.5.5"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
   }
 }

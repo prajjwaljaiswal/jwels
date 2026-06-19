@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
 import { PageHeader, Card } from '@/components/dashboard/DashboardShell';
@@ -170,8 +171,11 @@ function Field({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function VendorSettingsPage() {
-  const [tab, setTab] = useState<Tab>('account');
+function SettingsContent() {
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const isTab = (v: string | null): v is Tab => !!v && TABS.some((t) => t.id === v);
+  const [tab, setTab] = useState<Tab>(isTab(requestedTab) ? requestedTab : 'account');
   const [me, setMe] = useState<Me | null>(null);
   const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -240,6 +244,15 @@ export default function VendorSettingsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function VendorSettingsPage() {
+  // useSearchParams() must be inside a Suspense boundary in the App Router.
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
   );
 }
 

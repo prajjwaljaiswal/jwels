@@ -141,6 +141,7 @@ export default function AccountPage() {
         <h2 className="text-lg font-semibold text-ink-900 mb-3">Shortcuts</h2>
         <div className="flex flex-wrap gap-3">
           <Link href="/orders" className="btn-secondary">My orders</Link>
+          <Link href="/account/support" className="btn-secondary">Messages</Link>
           {me.role === 'VENDOR' && <Link href="/vendor" className="btn-secondary">Vendor dashboard</Link>}
           {me.role === 'ADMIN' && <Link href="/admin" className="btn-secondary">Admin</Link>}
         </div>

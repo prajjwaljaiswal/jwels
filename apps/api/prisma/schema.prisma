@@ -197,6 +197,19 @@ enum Permission {
   NOTIFICATION_MANAGE
   SHIPMENT_VIEW
   INVOICE_VIEW
+
+  // Marketing hub (catalog feeds, connections, tracking) and ad spend.
+  // MARKETING_ADS_MANAGE is split out so feed/catalog operators cannot move ad budget.
+  MARKETING_VIEW
+  MARKETING_MANAGE
+  MARKETING_ADS_MANAGE
+
+  // Support module (tickets + realtime chat). VIEW = read the platform queue /
+  // any thread; MANAGE = reply, assign, change status/priority, post internal
+  // notes, manage canned replies, close. Vendors authorize by ticket ownership,
+  // not these admin permissions.
+  SUPPORT_VIEW
+  SUPPORT_MANAGE
 }
 
 enum ShipmentStatus {
@@ -235,6 +248,9 @@ model User {
   role                     Role     @default(CUSTOMER)
   passwordResetToken       String?
   passwordResetTokenExpiry DateTime?
+  // Marketing consent (DPDP/GDPR) — gates pixel injection & server-side PII upload.
+  marketingConsent         ConsentStatus @default(UNKNOWN)
+  consentUpdatedAt         DateTime?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
 
@@ -248,6 +264,13 @@ model User {
   cart       Cart?
   wishlist   WishlistItem[]
   addresses  Address[]
+
+  // Support module
+  supportTicketsCreated  SupportTicket[]  @relation("SupportTicketCreator")
+  supportTicketsAssigned SupportTicket[]  @relation("SupportTicketAssignee")
+  supportMessages        SupportMessage[] @relation("SupportMessageAuthor")
+  cannedReplies          CannedReply[]    @relation("CannedReplyAuthor")
+  pushSubscriptions      PushSubscription[]
 }
 
 model AdminRole {
@@ -319,6 +342,10 @@ model Vendor {
   bankAccountNumber String?     // encrypted at rest
   bankIfsc          String?
 
+  // Managed marketing: vendor agreement allowing the platform/admin to run
+  // marketing on their behalf (gates platform-token sync + settlement deduction).
+  managedMarketingConsent Boolean @default(false)
+
   // Onboarding progress
   onboardingStep   Int          @default(0)
   kycStatus        KycStatus    @default(NOT_SUBMITTED)
@@ -345,6 +372,13 @@ model Vendor {
   pickups          CarrierPickup[]
   payouts          Payout[]
   returnRequests   ReturnRequest[]
+  marketingConnections MarketingConnection[]
+  marketingSpend       MarketingSpend[]
+  conversionEvents     ConversionEvent[]
+
+  // Support module
+  supportTickets       SupportTicket[]  @relation("SupportTicketVendor")
+  cannedReplies        CannedReply[]
 }
 
 enum VendorPageKind {
@@ -693,6 +727,14 @@ model Product {
   seoDescription String?
   isActive      Boolean  @default(true)
 
+  // --- Marketing / shopping-feed attributes (Meta Catalog + Google Merchant) ---
+  gtin                  String?             // UPC/EAN/JAN, 8–14 digits (often absent for jewellery → identifier_exists=false)
+  mpn                   String?             // Manufacturer Part Number
+  googleProductCategory String?             // Google taxonomy id or full path (override; else mapped from category)
+  feedCondition         FeedCondition       @default(NEW)
+  availabilityStatus    AvailabilityStatus? // null = derive from live stock (preferred)
+  feedExcluded          Boolean             @default(false) // vendor opt-out per product
+
   // Etsy-style listing taxonomy (Phase 2)
   status         ProductStatus @default(ACTIVE)
   itemType       ItemType      @default(PHYSICAL)
@@ -756,10 +798,13 @@ model Product {
   collections     Collection[] @relation("CollectionProducts")
   cartItems       CartItem[]
   wishlistedBy    WishlistItem[]
+  feedStates      ProductFeedState[]
+  supportTickets  SupportTicket[]
 
   @@index([vendorId])
   @@index([categoryId])
   @@index([isActive])
+  @@index([feedExcluded])
   @@index([status])
   @@index([featured])
   @@index([shopSectionId])
@@ -799,6 +844,7 @@ model ProductVariationCombo {
   price     Decimal? @db.Decimal(10, 2) // null = inherit Product.price
   stock     Int      @default(0)
   sku       String?
+  gtin      String?  // optional per-variant identifier for shopping feeds
 
   orderItems OrderItem[] @relation("OrderItemCombo")
   cartItems  CartItem[]  @relation("CartItemCombo")
@@ -895,6 +941,15 @@ model Order {
   giftMessage    String?
   giftWrapFee    Decimal @db.Decimal(10, 2) @default(0)
 
+  // Marketing attribution snapshot captured at checkout (survives later consent changes
+  // and works for guest orders). Click ids feed server-side conversion uploads (§8).
+  marketingConsent ConsentStatus @default(UNKNOWN)
+  gclid            String?       // Google click id
+  gbraid           String?       // Google app/web click id (iOS)
+  wbraid           String?       // Google web click id (iOS)
+  metaFbc          String?       // Meta click id cookie (_fbc)
+  metaFbp          String?       // Meta browser id cookie (_fbp)
+
   // Idempotency: a client-supplied key dedupes retried checkout submissions.
   idempotencyKey String? @unique
 
@@ -907,6 +962,8 @@ model Order {
   invoice     Invoice?
   returns     ReturnRequest[]
   disputes    Dispute[]
+  conversionEvents ConversionEvent[]
+  supportTickets   SupportTicket[]
 
   @@index([customerId])
   @@index([status])
@@ -953,6 +1010,7 @@ model OrderItem {
   shipment         Shipment?
   payoutItem       PayoutItem?
   returns          ReturnRequest[]
+  supportTickets   SupportTicket[]
 
   @@index([orderId])
   @@index([vendorId])
@@ -1311,4 +1369,314 @@ model Dispute {
 
   @@index([status])
   @@index([orderId])
+}
+
+// ============================================================================
+// Marketing hub — catalog/feed syndication (Meta + Google), connections,
+// conversion tracking and per-vendor ad-spend ledger. See docs/marketing-integration-plan.md.
+// ============================================================================
+
+enum FeedCondition {
+  NEW
+  REFURBISHED
+  USED
+}
+
+enum AvailabilityStatus {
+  IN_STOCK
+  OUT_OF_STOCK
+  PREORDER
+  BACKORDER
+}
+
+enum MarketingPlatform {
+  META
+  GOOGLE
+}
+
+enum MarketingMode {
+  TEST
+  LIVE
+}
+
+enum FeedItemStatus {
+  PENDING
+  SYNCED
+  ERROR
+  EXCLUDED
+}
+
+enum ConsentStatus {
+  GRANTED
+  DENIED
+  UNKNOWN
+}
+
+// A vendor's link to a marketing platform. credentials holds encryptJson(tokens);
+// when managedByPlatform=true the platform System User / service-account token drives
+// sync and credentials may be null (vendor never OAuths).
+model MarketingConnection {
+  id                 String            @id @default(uuid())
+  vendorId           String
+  vendor             Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  platform           MarketingPlatform
+  mode               MarketingMode     @default(LIVE)
+  credentials        String?           // encryptJson({ accessToken, refreshToken, expiresAt, ... })
+  publicConfig       Json?             // client-safe: { catalogId, productSetId, merchantId, externalSellerId, accountName }
+  status             String            @default("CONNECTED") // CONNECTED | EXPIRED | REVOKED | ERROR
+  errorMessage       String?
+  managedByPlatform  Boolean           @default(false) // mode (b): platform token drives sync
+  connectedByAdminId String?           // admin User.id when connected on behalf; null = vendor self-connected
+  lastVerifiedAt     DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([vendorId, platform])
+  @@index([vendorId])
+}
+
+// Per-product, per-platform sync status + last-pushed values for drift detection.
+// vendorId is denormalized from Product so admin/overview queries can group by vendor.
+model ProductFeedState {
+  id             String            @id @default(uuid())
+  productId      String
+  product        Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendorId       String
+  platform       MarketingPlatform
+  status         FeedItemStatus    @default(PENDING)
+  externalItemId String?           // Meta retailer_id / Google product resource name
+  lastSyncedAt   DateTime?
+  lastPrice      Decimal?          @db.Decimal(10, 2)
+  lastAvailable  String?
+  errorMessage   String?
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([productId, platform])
+  @@index([status])
+  @@index([vendorId])
+  @@index([vendorId, status])
+}
+
+// One row per (order, platform, vendor, eventName) — supports multi-vendor orders +
+// idempotency via the unique constraint. value is this vendor's allocated share (§8b).
+model ConversionEvent {
+  id          String            @id @default(uuid())
+  orderId     String
+  order       Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendorId    String
+  vendor      Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  platform    MarketingPlatform
+  eventName   String            // "Purchase" | "Refund"
+  eventId     String            // dedup key, namespaced per vendor: `${orderId}:${vendorId}`
+  value       Decimal           @db.Decimal(10, 2)
+  currency    String            @default("INR")
+  status      String            @default("SENT") // SENT | FAILED
+  responseRef String?           // fbtrace_id / adjustment handle
+  sentAt      DateTime          @default(now())
+
+  @@unique([orderId, platform, vendorId, eventName])
+  @@index([orderId])
+}
+
+// Per-vendor ad-spend ledger feeding gross-minus-commission settlement (§7A.8).
+// LIVE rows are deducted at settlement (only when the vendor consented); TEST never counts.
+model MarketingSpend {
+  id                 String            @id @default(uuid())
+  vendorId           String
+  vendor             Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  platform           MarketingPlatform
+  externalCampaignId String?
+  amount             Decimal           @db.Decimal(10, 2)
+  currency           String            @default("INR")
+  mode               MarketingMode     @default(LIVE) // TEST excluded from settlement
+  incurredAt         DateTime          @default(now())
+  createdById        String?           // admin who launched the spend (provenance)
+  createdAt          DateTime          @default(now())
+
+  @@index([vendorId])
+  @@index([vendorId, mode, incurredAt])
+}
+
+// ============================================================================
+// Support module — unified ticketing + realtime chat.
+// One SupportTicket = one thread; SupportMessage rows stream in realtime.
+// REST is the source of truth (every message is persisted by an endpoint);
+// the socket only notifies the room. Three topologies, distinguished by
+// (creatorRole, vendorId):
+//   customer ↔ vendor    : creator CUSTOMER, vendorId set
+//   customer ↔ platform  : creator CUSTOMER, vendorId null  (admin queue)
+//   vendor   ↔ platform  : creator VENDOR,   vendorId null  (admin queue)
+// vendorId null always means "platform/admin queue".
+// ============================================================================
+
+enum TicketStatus {
+  OPEN               // newly created, awaiting first agent response
+  PENDING            // agent is working it / replied, awaiting internal action
+  AWAITING_CUSTOMER  // agent replied, ball is in the requester's court
+  RESOLVED           // agent marked solved; reopens to OPEN on a new customer reply
+  CLOSED             // terminal; archived, no further replies
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  ORDER             // delivery, status, cancellation
+  PAYMENT           // payment/refund/payout money issues
+  RETURN_REFUND     // links to a ReturnRequest/Dispute
+  PRODUCT           // product question / listing issue
+  SHIPPING          // tracking, lost/damaged parcel
+  ACCOUNT           // login, profile, KYC
+  VENDOR_ONBOARDING // vendor↔platform onboarding/KYC help
+  TECHNICAL         // bugs / platform faults
+  OTHER
+}
+
+// Snapshot of the message author's role at send time. Kept independent of the
+// live User.role so a thread renders correctly even if the user is later
+// promoted/demoted (e.g. a customer who becomes a vendor).
+enum SenderRole {
+  CUSTOMER
+  VENDOR
+  ADMIN
+  SYSTEM // automated/SLA/status-change messages
+}
+
+model SupportTicket {
+  id           String         @id @default(uuid())
+  // Human-readable, app-generated (e.g. "TKT/2026/000123"), unique like Invoice number.
+  ticketNumber String         @unique
+
+  subject      String
+  category     TicketCategory @default(OTHER)
+  priority     TicketPriority @default(NORMAL)
+  status       TicketStatus   @default(OPEN)
+
+  // Who opened the ticket. Loose ref (no cascade) so a thread survives user
+  // deletion; creatorRole snapshots the role at creation to disambiguate topology.
+  creatorId    String
+  creator      User           @relation("SupportTicketCreator", fields: [creatorId], references: [id])
+  creatorRole  SenderRole
+
+  // Target vendor. NULL = platform/admin queue. Set = customer↔vendor thread
+  // routed to that vendor's inbox.
+  vendorId     String?
+  vendor       Vendor?        @relation("SupportTicketVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  // Optional context links — SetNull so deleting the order/product keeps history.
+  orderId      String?
+  order        Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId  String?
+  orderItem    OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  productId    String?
+  product      Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // Assigned agent (admin or vendor staff user). Loose ref + SetNull on delete.
+  assignedToId String?
+  assignedTo   User?          @relation("SupportTicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // --- Realtime / sorting ---
+  lastMessageAt DateTime      @default(now()) // bumped on every message; primary inbox sort key
+
+  // --- Read tracking (denormalized unread counters; cheap to render badges) ---
+  customerUnread     Int       @default(0) // unread by the requester/customer side
+  agentUnread        Int       @default(0) // unread by the vendor/admin agent side
+  customerLastReadAt DateTime?
+  agentLastReadAt    DateTime?
+
+  // --- SLA timestamps (stamp on transition; derive SLA status on read) ---
+  firstResponseAt DateTime? // first non-system staff reply (first-response SLA)
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+
+  tags         String[]       @default([])
+  metadata     Json?          // source channel, escalation refs, PII-flag details, etc.
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  messages     SupportMessage[]
+
+  @@index([creatorId, lastMessageAt])        // customer's own tickets, recent first
+  @@index([vendorId, status, lastMessageAt]) // vendor inbox by status
+  @@index([status, lastMessageAt])           // admin/platform queue (vendorId null)
+  @@index([assignedToId, status])            // agent workload
+  @@index([orderId])
+  @@index([productId])
+  @@index([category, status])
+}
+
+model SupportMessage {
+  id         String        @id @default(uuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  // Author. Loose ref (no cascade) so message history survives user deletion;
+  // authorRole + authorName snapshot the sender for stable rendering.
+  authorId   String
+  author     User          @relation("SupportMessageAuthor", fields: [authorId], references: [id])
+  authorRole SenderRole
+  authorName String        // display snapshot at send time
+
+  body        String
+  attachments String[]     @default([]) // Cloudinary secure_urls (images + PDF, ~10MB cap)
+
+  // Staff-only internal note — never returned to the customer/vendor requester.
+  isInternalNote Boolean   @default(false)
+
+  // Lightweight PII / off-platform guardrail (flag, don't hard-block in v1).
+  flagged    Boolean       @default(false)
+  flagReason String?
+
+  readAt      DateTime?    // when the counterpart side first read this message
+  systemEvent String?      // null for human messages; e.g. "STATUS_CHANGED", "ASSIGNED"
+  metadata    Json?
+
+  createdAt   DateTime     @default(now())
+
+  @@index([ticketId, createdAt]) // thread render, chronological
+  @@index([authorId])
+}
+
+// Reusable reply templates for vendor/admin agents. Scope: a vendor's templates
+// (vendorId set) or platform/admin templates (vendorId null). isShared exposes a
+// template to the whole team (a vendor's staff, or all admins) vs. just the author.
+model CannedReply {
+  id          String          @id @default(uuid())
+  vendorId    String?
+  vendor      Vendor?         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User            @relation("CannedReplyAuthor", fields: [createdById], references: [id], onDelete: Cascade)
+
+  title       String
+  body        String
+  category    TicketCategory?
+  isShared    Boolean         @default(true)
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([vendorId])
+  @@index([createdById])
+}
+
+// Web Push (browser) subscriptions for support notifications. One row per
+// browser/device endpoint. urlTemplate carries the per-app deep link with an
+// {id} placeholder so the service worker opens the right ticket on any app.
+model PushSubscription {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint    String   @unique
+  p256dh      String
+  auth        String
+  urlTemplate String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }

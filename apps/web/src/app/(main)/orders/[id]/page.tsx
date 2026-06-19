@@ -434,7 +434,7 @@ export default function OrderDetailPage() {
           <div className="bg-surface border border-line rounded-md shadow-card p-5">
             <h2 className="text-sm font-semibold text-ink-900 mb-3">Need help?</h2>
             <p className="text-xs text-ink-500 mb-3">Reach out about this order and we'll get back to you.</p>
-            <Link href="/help" className="btn-secondary w-full text-center !py-2 text-sm">Contact support</Link>
+            <Link href={`/account/support/new?order=${order.id}`} className="btn-secondary w-full text-center !py-2 text-sm">Contact support</Link>
           </div>
         </aside>
       </div>

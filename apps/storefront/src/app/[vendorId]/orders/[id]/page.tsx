@@ -141,7 +141,13 @@ export default function VendorOrderDetailPage() {
             <span className="font-mono">#{order.id.slice(0, 8).toUpperCase()}</span>
           </p>
         </div>
-        <ThemedStatusPill status={scoped.status} accent={theme} />
+        <div className="flex flex-col items-end gap-2">
+          <ThemedStatusPill status={scoped.status} accent={theme} />
+          <Link href={`${basePath}/account/support/new?order=${order.id}`}
+            className="text-sm underline underline-offset-2 hover:opacity-70" style={{ color: theme }}>
+            Need help? Contact seller
+          </Link>
+        </div>
       </div>
 
       <div className="bg-surface border border-line rounded-md shadow-card p-6 mb-6">

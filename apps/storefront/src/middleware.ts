@@ -18,6 +18,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
+    pathname === '/push-sw.js' ||           // static service worker — serve as-is, never vendor-prefix
     ROOT_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`)) ||
     domain === APP_DOMAIN ||
     domain === 'localhost' ||
@@ -52,5 +53,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|push-sw.js).*)'],
 };

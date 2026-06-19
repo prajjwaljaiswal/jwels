@@ -33,7 +33,7 @@ function RegisterInner() {
   const [loading, setLoading] = useState(false);
 
   function routeByRole(role: string) {
-    if (role === 'VENDOR') router.push('/sell/onboard');
+    if (role === 'VENDOR') router.push('/settings?tab=shop');
     else router.push('/products');
   }
 
