@@ -17,6 +17,7 @@ import {
 } from '../lib/blockSchemas';
 import { aiAvailable, generatePageBlocks, generateTheme } from '../lib/ai';
 import { defaultBlocksFor, SYSTEM_TITLES, type SystemPageKind } from '../lib/themePresets';
+import { notifyStorefrontRevalidate } from '../lib/revalidate';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
@@ -302,6 +303,10 @@ router.post('/me/:id/publish', requireAuth, requireRole(Role.VENDOR), async (req
       const toDelete = all.slice(MAX_VERSIONS_PER_PAGE).map((v) => v.id);
       await prisma.vendorPageVersion.deleteMany({ where: { id: { in: toDelete } } });
     }
+
+    // Publishing changes live storefront content → bump the vendor's cache signal + revalidate.
+    await prisma.vendor.update({ where: { id: owned.vendor.id }, data: { themeVersion: { increment: 1 } } });
+    await notifyStorefrontRevalidate(owned.vendor.id);
 
     res.json({ page: updatedPage, version });
   } catch (e) { next(e); }

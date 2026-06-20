@@ -1,14 +1,17 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { Role, VendorStatus, BusinessType, KycStatus, CategoryApprovalStatus } from '@prisma/client';
+import { Role, VendorStatus, DomainStatus, BusinessType, KycStatus, CategoryApprovalStatus } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import { promises as dns } from 'dns';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { uploadBuffer } from '../lib/cloudinary';
 import { encryptString, decryptString, maskSecret } from '../lib/crypto';
-import { isValidVendorSlug, RESERVED_VENDOR_SLUGS, resolveVendorId, uniqueVendorSlug, VENDOR_UUID_RE } from '../lib/vendor-slug';
+import { isValidVendorSlug, RESERVED_VENDOR_SLUGS, RESERVED_SUBDOMAINS, resolveVendorId, uniqueVendorSlug, VENDOR_UUID_RE } from '../lib/vendor-slug';
 import { listPresets, getPreset, SYSTEM_TITLES, type SystemPageKind } from '../lib/themePresets';
 import { SYSTEM_PAGE_SLUGS } from '../lib/blockSchemas';
+import { notifyStorefrontRevalidate } from '../lib/revalidate';
 
 const router = Router();
 
@@ -368,11 +371,133 @@ router.patch(
         }
       }
 
+      // Branding/identity edits invalidate the storefront cache for this vendor.
+      updates.themeVersion = { increment: 1 };
       const updated = await prisma.vendor.update({ where: { id: vendor.id }, data: updates });
+      await notifyStorefrontRevalidate(vendor.id);
       res.json(updated);
     } catch (e) { next(e); }
   }
 );
+
+// ── SUBDOMAIN & CUSTOM DOMAIN (authenticated vendor) ──────────────────────────
+
+// Claim / replace the vendor's subdomain label → {sub}.store.<APP_DOMAIN>.
+// No DNS verification needed: the label is platform-owned and covered by the wildcard cert.
+router.post('/me/subdomain', requireAuth, requireRole(Role.VENDOR), async (req, res, next) => {
+  try {
+    const sub = String(req.body?.subdomain ?? '').trim().toLowerCase();
+    if (!isValidVendorSlug(sub)) {
+      return res.status(400).json({ error: 'Subdomain must be 3–60 lowercase letters, digits or dashes.' });
+    }
+    if (RESERVED_SUBDOMAINS.has(sub)) {
+      return res.status(400).json({ error: 'This subdomain is reserved. Please choose another.' });
+    }
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not created' });
+    const conflict = await prisma.vendor.findUnique({ where: { subdomain: sub }, select: { id: true } });
+    if (conflict && conflict.id !== vendor.id) {
+      return res.status(409).json({ error: 'This subdomain is taken by another shop.' });
+    }
+    const updated = await prisma.vendor.update({ where: { id: vendor.id }, data: { subdomain: sub } });
+    await notifyStorefrontRevalidate(vendor.id);
+    res.json(vendorPublicView(updated));
+  } catch (e) { next(e); }
+});
+
+// Register / replace a custom domain → sets PENDING + a one-time TXT token, returns the
+// DNS records the vendor must add (TXT for ownership, CNAME or A for routing).
+router.post('/me/custom-domain', requireAuth, requireRole(Role.VENDOR), async (req, res, next) => {
+  try {
+    const domain = String(req.body?.domain ?? '')
+      .trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(domain)) {
+      return res.status(400).json({ error: 'Enter a valid domain, e.g. shop.example.com' });
+    }
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not created' });
+    const conflict = await prisma.vendor.findUnique({ where: { customDomain: domain }, select: { id: true } });
+    if (conflict && conflict.id !== vendor.id) {
+      return res.status(409).json({ error: 'This domain is already in use by another shop.' });
+    }
+    const token = randomBytes(16).toString('hex');
+    await prisma.vendor.update({
+      where: { id: vendor.id },
+      data: {
+        customDomain: domain,
+        customDomainStatus: DomainStatus.PENDING,
+        customDomainToken: token,
+        customDomainVerifiedAt: null,
+        themeVersion: { increment: 1 },
+      },
+    });
+    const isApex = domain.split('.').length === 2;
+    const ingressIps = (process.env.INGRESS_IPS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    const routingTarget = `store.${process.env.APP_DOMAIN ?? 'vrindaonline.com'}`;
+    res.json({
+      domain,
+      status: 'PENDING',
+      dns: [
+        { type: 'TXT', host: `_vrinda-verify.${domain}`, value: token },
+        isApex
+          ? { type: 'A', host: domain, value: ingressIps.length ? ingressIps : ['<configure INGRESS_IPS>'] }
+          : { type: 'CNAME', host: domain, value: routingTarget },
+      ],
+    });
+  } catch (e) { next(e); }
+});
+
+// Verify a pending custom domain: TXT token proves ownership, CNAME/A proves it routes to us.
+router.post('/me/custom-domain/verify', requireAuth, requireRole(Role.VENDOR), async (req, res, next) => {
+  try {
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not created' });
+    if (!vendor.customDomain || !vendor.customDomainToken) {
+      return res.status(400).json({ error: 'No custom domain pending verification.' });
+    }
+    const domain = vendor.customDomain;
+
+    // 1) Ownership — TXT record matches the issued token.
+    let ownsToken = false;
+    const txt = await dns.resolveTxt(`_vrinda-verify.${domain}`).catch(() => [] as string[][]);
+    ownsToken = txt.some((chunks) => chunks.join('').trim() === vendor.customDomainToken);
+
+    // 2) Routing — CNAME → store.<APP_DOMAIN>, OR A/AAAA → one of INGRESS_IPS (apex case).
+    const expectedCname = `store.${process.env.APP_DOMAIN ?? 'vrindaonline.com'}`;
+    const ingressIps = (process.env.INGRESS_IPS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    let routesHere = false;
+    const cnames = await dns.resolveCname(domain).catch(() => [] as string[]);
+    if (cnames.some((c) => c.replace(/\.$/, '').toLowerCase() === expectedCname)) routesHere = true;
+    if (!routesHere && ingressIps.length) {
+      const a4 = await dns.resolve4(domain).catch(() => [] as string[]);
+      const a6 = await dns.resolve6(domain).catch(() => [] as string[]);
+      if ([...a4, ...a6].some((ip) => ingressIps.includes(ip))) routesHere = true;
+    }
+
+    if (ownsToken && routesHere) {
+      const updated = await prisma.vendor.update({
+        where: { id: vendor.id },
+        data: {
+          customDomainStatus: DomainStatus.VERIFIED,
+          customDomainVerifiedAt: new Date(),
+          themeVersion: { increment: 1 },
+        },
+      });
+      await notifyStorefrontRevalidate(vendor.id);
+      return res.json({ status: 'VERIFIED', vendor: vendorPublicView(updated) });
+    }
+
+    await prisma.vendor.update({ where: { id: vendor.id }, data: { customDomainStatus: DomainStatus.FAILED } });
+    return res.status(422).json({
+      status: 'FAILED',
+      ownsToken,
+      routesHere,
+      error: !ownsToken
+        ? 'TXT verification record not found yet — DNS may still be propagating.'
+        : 'Domain does not point to our servers yet (CNAME/A record).',
+    });
+  } catch (e) { next(e); }
+});
 
 router.get('/me', requireAuth, requireRole(Role.VENDOR), async (req, res) => {
   const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.id } });
@@ -784,6 +909,93 @@ router.get('/by-domain/:domain', async (req, res) => {
   res.json(vendor);
 });
 
+// ── MULTI-TENANT HOST RESOLUTION (public) ─────────────────────────────────────
+// LOAD-BEARING ORDER: the bare-segment routes below (/resolve, /domain-allowed) MUST
+// stay above `router.get('/:vendorId')` or Express captures them as :vendorId='resolve'
+// (→ slug lookup → 404). Do not move them below this point.
+
+// Storefront middleware hot path: map a host (subdomain slug OR custom domain) → vendor.
+// GET /api/vendors/resolve?by=subdomain|domain&key=<value>
+router.get('/resolve', async (req, res) => {
+  const by = String(req.query.by ?? '');
+  const key = String(req.query.key ?? '').trim().toLowerCase();
+  if (!key || (by !== 'subdomain' && by !== 'domain')) {
+    return res.status(400).json({ error: 'missing_or_invalid_params' });
+  }
+  const where = by === 'subdomain' ? { subdomain: key } : { customDomain: key };
+  const vendor = await prisma.vendor.findUnique({
+    where: where as any,
+    select: { id: true, slug: true, status: true, themeVersion: true, customDomainStatus: true },
+  });
+  if (!vendor || vendor.status !== VendorStatus.APPROVED) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  // Custom domains must be DNS-verified; subdomains are platform-owned (wildcard cert) so always trusted.
+  if (by === 'domain' && vendor.customDomainStatus !== DomainStatus.VERIFIED) {
+    return res.status(404).json({ error: 'unverified' });
+  }
+  res.set('Cache-Control', 'public, max-age=30, s-maxage=300');
+  res.json({ vendorId: vendor.id, slug: vendor.slug ?? vendor.id, themeVersion: vendor.themeVersion });
+});
+
+// Caddy on-demand-TLS gate: 200 only for a VERIFIED custom domain, else non-2xx (no cert minted).
+// GET /api/vendors/domain-allowed?domain=<host>
+router.get('/domain-allowed', async (req, res) => {
+  const domain = String(req.query.domain ?? '').trim().toLowerCase();
+  if (!domain) return res.sendStatus(404);
+  const v = await prisma.vendor.findUnique({
+    where: { customDomain: domain },
+    select: { status: true, customDomainStatus: true },
+  });
+  if (v?.status === VendorStatus.APPROVED && v.customDomainStatus === DomainStatus.VERIFIED) {
+    return res.sendStatus(200);
+  }
+  return res.sendStatus(404);
+});
+
+// Lightweight brand/theme payload for the RSC storefront layout — avoids the heavy
+// `/:vendorId` aggregate (products + sections + reviews) just to render theme + metadata.
+// GET /api/vendors/:vendorId/brand   (UUID or slug)
+router.get('/:vendorId/brand', async (req, res) => {
+  const id = await resolveVendorId(req.params.vendorId);
+  if (!id) return res.status(404).json({ error: 'not_found' });
+  const vendor = await prisma.vendor.findUnique({
+    where: { id },
+    select: {
+      id: true, slug: true, shopName: true, shopLogoUrl: true, bannerUrls: true,
+      tagline: true, description: true, themeColor: true, theme: true, themePresetKey: true,
+      subdomain: true, customDomain: true, customDomainStatus: true, themeVersion: true, status: true,
+    },
+  });
+  if (!vendor || vendor.status !== VendorStatus.APPROVED) {
+    return res.status(404).json({ error: 'not_found' });
+  }
+  res.set('Cache-Control', 'public, max-age=30, s-maxage=300');
+  res.json({ vendor });
+});
+
+// Sitemap data for a tenant: published custom-page slugs + active product path segments.
+// GET /api/vendors/:vendorId/sitemap-entries
+router.get('/:vendorId/sitemap-entries', async (req, res) => {
+  const id = await resolveVendorId(req.params.vendorId);
+  if (!id) return res.status(404).json({ error: 'not_found' });
+  const [pages, products] = await Promise.all([
+    prisma.vendorPage.findMany({
+      where: { vendorId: id, isPublished: true, pageKind: 'CUSTOM' },
+      select: { slug: true },
+    }),
+    prisma.product.findMany({
+      where: { vendorId: id, isActive: true, status: 'ACTIVE' },
+      select: { id: true, slug: true },
+    }),
+  ]);
+  res.set('Cache-Control', 'public, max-age=300, s-maxage=3600');
+  res.json({
+    pages: pages.map((p) => p.slug),
+    products: products.map((p) => p.slug ?? p.id), // storefront links use `slug || id`
+  });
+});
+
 // Public: vendor storefront by ID or slug
 router.get('/:vendorId', async (req, res) => {
   const key = req.params.vendorId;
@@ -1046,6 +1258,7 @@ router.post('/me/theme/preset', requireAuth, requireRole(Role.VENDOR), async (re
           themeColor: preset.themeColor,
           theme: themeParsed.data as any,
           themePresetKey: preset.meta.key,
+          themeVersion: { increment: 1 },
         },
       });
 
@@ -1079,6 +1292,7 @@ router.post('/me/theme/preset', requireAuth, requireRole(Role.VENDOR), async (re
     });
 
     const fresh = await prisma.vendor.findUnique({ where: { id: vendor.id } });
+    await notifyStorefrontRevalidate(vendor.id);
     res.json(vendorPublicView(fresh));
   } catch (e) { next(e); }
 });

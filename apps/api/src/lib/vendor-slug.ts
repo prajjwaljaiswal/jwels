@@ -9,6 +9,14 @@ export const RESERVED_VENDOR_SLUGS = new Set([
   'support', 'privacy', 'terms', 'static', '_next', 'public',
 ]);
 
+// Subdomain labels that must never resolve to a vendor storefront: the reserved
+// vendor slugs plus infra-owned hostnames. The storefront middleware keeps an
+// in-sync copy of the infra labels — keep both aligned (see CLAUDE.md / the plan).
+export const RESERVED_SUBDOMAINS = new Set<string>([
+  ...RESERVED_VENDOR_SLUGS,
+  'www', 'api', 'admin', 'vendor', 'store',
+]);
+
 export function slugifyVendor(name: string): string {
   return (
     name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60)

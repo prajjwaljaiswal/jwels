@@ -23,6 +23,14 @@ enum VendorStatus {
   SUSPENDED
 }
 
+// Verification state of a vendor's custom domain (see docs/storefront-multitenancy-plan.md).
+enum DomainStatus {
+  NONE
+  PENDING
+  VERIFIED
+  FAILED
+}
+
 enum BusinessType {
   INDIVIDUAL
   PROPRIETORSHIP
@@ -305,6 +313,12 @@ model Vendor {
   theme        Json?        // full vendor theme config: colors, typography, header & footer content
   themePresetKey String?    // null = custom; otherwise "classic" | "modern" | "minimal" | "luxury" | "boutique"
   customDomain String?      @unique
+  // Multi-tenant storefront routing (see docs/storefront-multitenancy-plan.md)
+  subdomain              String?      @unique  // "{sub}.store.vrindaonline.com"; independent public id, NOT a mirror of `slug`
+  customDomainStatus     DomainStatus @default(NONE)
+  customDomainToken      String?               // one-time DNS TXT verification token
+  customDomainVerifiedAt DateTime?
+  themeVersion           Int          @default(1) // bumped on theme/page publish; cache key + invalidation signal
   status       VendorStatus @default(PENDING)
 
   // Business / KYC
