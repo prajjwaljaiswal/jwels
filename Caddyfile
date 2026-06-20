@@ -1,0 +1,44 @@
+# Caddyfile — multi-tenant storefront TLS + host routing for vrindaonline.
+# Full runbook: docs/deploy-multitenancy.md
+#
+# REQUIRES a Caddy binary built with your DNS provider plugin (for the wildcard DNS-01
+# challenge). Example with Cloudflare:
+#   xcaddy build --with github.com/caddy-dns/cloudflare
+# Swap `cloudflare` + CF_API_TOKEN below for your actual DNS provider/token.
+
+{
+	# On-demand TLS for vendor CUSTOM domains: before issuing a cert for an unknown SNI,
+	# Caddy asks the API whether that exact domain is an APPROVED + VERIFIED custom domain.
+	# Any non-2xx answer => no cert minted (prevents cert minting for dangling domains).
+	on_demand_tls {
+		ask http://127.0.0.1:4000/api/vendors/domain-allowed
+	}
+}
+
+# ─── App domain + ALL vendor subdomains — ONE wildcard cert via DNS-01 ─────────
+# {slug}.store.vrindaonline.com tenants are served here. These named blocks are matched
+# by SNI BEFORE the :443 on-demand catch-all, so subdomains never hit on-demand issuance.
+store.vrindaonline.com, *.store.vrindaonline.com {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+	}
+	reverse_proxy 127.0.0.1:3003
+}
+
+# ─── Other first-party apps — their own named blocks (normal HTTP-01 certs) ────
+api.vrindaonline.com                    { reverse_proxy 127.0.0.1:4000 }
+vrindaonline.com, www.vrindaonline.com  { reverse_proxy 127.0.0.1:3000 }
+vendor.vrindaonline.com                 { reverse_proxy 127.0.0.1:3001 }
+admin.vrindaonline.com                  { reverse_proxy 127.0.0.1:3002 }
+
+# ─── Vendor CUSTOM domains (jhumkaya.com, shop.brand.com, …) ───────────────────
+# Reached ONLY for SNIs that match none of the named blocks above. The cert is minted on
+# the first TLS handshake, gated by on_demand_tls.ask — so only domains the API reports
+# as VERIFIED get a certificate. The storefront middleware then resolves the host to the
+# vendor and rewrites into the /[vendorId] route tree.
+:443 {
+	tls {
+		on_demand
+	}
+	reverse_proxy 127.0.0.1:3003
+}
