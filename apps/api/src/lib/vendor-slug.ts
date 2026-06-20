@@ -7,6 +7,8 @@ export const RESERVED_VENDOR_SLUGS = new Set([
   'vendor', 'vendors', 'category', 'categories', 'collections',
   'search', 'sitemap', 'robots', 'about', 'contact', 'help',
   'support', 'privacy', 'terms', 'static', '_next', 'public',
+  // Storefront neutral-page routes — reserved so a vendor slug can't shadow them on the app domain.
+  'tenant-unavailable', 'tenant-error',
 ]);
 
 // Subdomain labels that must never resolve to a vendor storefront: the reserved
