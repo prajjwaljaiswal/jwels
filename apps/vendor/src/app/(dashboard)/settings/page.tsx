@@ -63,6 +63,9 @@ interface VendorProfile {
   address: string | null;
   themeColor: string | null;
   customDomain: string | null;
+  customDomainStatus: string | null;
+  customDomainToken: string | null;
+  subdomain: string | null;
   shopLogoUrl: string | null;
   theme: any | null;
   businessType: string | null;
@@ -88,7 +91,7 @@ interface PickupAddress {
   country: string;
 }
 
-type Tab = 'account' | 'shop' | 'business' | 'bank' | 'address' | 'preferences';
+type Tab = 'account' | 'shop' | 'domains' | 'business' | 'bank' | 'address' | 'preferences';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -106,6 +109,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'domains',
+    label: 'Domains',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>
       </svg>
     ),
   },
@@ -232,6 +244,7 @@ export default function VendorSettingsPage() {
           <div className="flex-1 min-w-0">
             {tab === 'account' && me && <AccountTab me={me} onSaved={load} />}
             {tab === 'shop' && vendor && <ShopTab vendor={vendor} onSaved={load} />}
+            {tab === 'domains' && vendor && <DomainsTab vendor={vendor} onSaved={load} />}
             {tab === 'business' && vendor && <BusinessTab vendor={vendor} onSaved={load} />}
             {tab === 'bank' && vendor && <BankTab vendor={vendor} onSaved={load} />}
             {tab === 'address' && vendor && <AddressTab vendor={vendor} onSaved={load} />}
@@ -343,7 +356,6 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
     description:  vendor.description ?? '',
     address:      vendor.address ?? '',
     themeColor:   vendor.themeColor ?? '#4F46E5',
-    customDomain: vendor.customDomain ?? '',
     logoHeight:   String(vendor.theme?.header?.logoHeight ?? 48),
     logoMaxWidth: String(vendor.theme?.header?.logoMaxWidth ?? 200),
     animEnabled:  String(vendor.theme?.animations?.enabled ?? true),
@@ -392,7 +404,6 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
       if (form.description.trim())  fd.append('description', form.description.trim());
       if (form.address.trim())      fd.append('address', form.address.trim());
       if (form.themeColor)          fd.append('themeColor', form.themeColor);
-      if (form.customDomain.trim()) fd.append('customDomain', form.customDomain.trim());
       fd.append('theme', JSON.stringify(theme));
       if (logoFile)    fd.append('logo', logoFile);
       if (faviconFile) fd.append('favicon', faviconFile);
@@ -441,22 +452,15 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
             onChange={(e) => patch('address', e.target.value)} />
         </Field>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Brand colour" hint="Accent colour shown on your storefront.">
-            <div className="flex gap-2 items-center">
-              <input type="color" className="h-10 w-12 rounded border border-line p-0.5 cursor-pointer"
-                value={form.themeColor}
-                onChange={(e) => patch('themeColor', e.target.value)} />
-              <input className="input-field font-mono flex-1" value={form.themeColor} maxLength={7}
-                onChange={(e) => patch('themeColor', e.target.value)} />
-            </div>
-          </Field>
-          <Field label="Custom domain (optional)" hint="e.g. shop.yourbrand.com — requires DNS setup.">
-            <input className="input-field font-mono" value={form.customDomain} maxLength={253}
-              placeholder="shop.yourbrand.com"
-              onChange={(e) => patch('customDomain', e.target.value.toLowerCase())} />
-          </Field>
-        </div>
+        <Field label="Brand colour" hint="Accent colour shown on your storefront. Connect a custom domain or subdomain in the Domains tab.">
+          <div className="flex gap-2 items-center max-w-xs">
+            <input type="color" className="h-10 w-12 rounded border border-line p-0.5 cursor-pointer"
+              value={form.themeColor}
+              onChange={(e) => patch('themeColor', e.target.value)} />
+            <input className="input-field font-mono flex-1" value={form.themeColor} maxLength={7}
+              onChange={(e) => patch('themeColor', e.target.value)} />
+          </div>
+        </Field>
 
         {/* ── Logo & favicon ──────────────────────────────────────────── */}
         <div className="border-t border-line pt-4 mt-2">
@@ -566,6 +570,192 @@ function ShopTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => vo
         </div>
       </form>
     </Card>
+  );
+}
+
+// ── Tab: Domains ──────────────────────────────────────────────────────────────
+
+interface DnsRecord { type: string; host: string; value: string | string[] }
+
+const DOMAIN_BADGE: Record<string, { label: string; cls: string }> = {
+  NONE:     { label: 'Not set',               cls: 'bg-canvas text-ink-500 border border-line' },
+  PENDING:  { label: 'Pending verification',  cls: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  VERIFIED: { label: 'Verified',              cls: 'bg-emerald-50 text-success border border-emerald-200' },
+  FAILED:   { label: 'Verification failed',   cls: 'bg-red-50 text-danger border border-red-200' },
+};
+
+// Rebuild the DNS records to show after a reload (the add-response is only returned once).
+// Correct for subdomain custom domains; apex domains need the A record shown at add time.
+function buildDnsRecords(domain: string, token: string, appDomain: string): DnsRecord[] {
+  const isApex = domain.split('.').length === 2;
+  return [
+    { type: 'TXT', host: `_vrinda-verify.${domain}`, value: token },
+    isApex
+      ? { type: 'A', host: domain, value: 'Your platform ingress IP (shown when you first added this domain)' }
+      : { type: 'CNAME', host: domain, value: appDomain },
+  ];
+}
+
+function DomainsTab({ vendor, onSaved }: { vendor: VendorProfile; onSaved: () => void }) {
+  const APP_DOMAIN = process.env.NEXT_PUBLIC_APP_DOMAIN || 'store.vrindaonline.com';
+
+  // ── Subdomain ──
+  const [sub, setSub] = useState(vendor.subdomain ?? '');
+  const [savingSub, setSavingSub] = useState(false);
+
+  async function saveSubdomain(e: React.FormEvent) {
+    e.preventDefault();
+    const v = sub.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/.test(v)) {
+      return toast.error('Subdomain must be 3–60 lowercase letters, digits or dashes.');
+    }
+    setSavingSub(true);
+    try {
+      await api('/api/vendors/me/subdomain', { method: 'POST', body: JSON.stringify({ subdomain: v }) });
+      toast.success('Subdomain saved');
+      onSaved();
+    } catch { /* api() already surfaced the reason (reserved / taken / invalid) */ }
+    finally { setSavingSub(false); }
+  }
+
+  // ── Custom domain ──
+  const status = vendor.customDomainStatus ?? 'NONE';
+  const badge = DOMAIN_BADGE[status] ?? DOMAIN_BADGE.NONE;
+  const [domain, setDomain] = useState(vendor.customDomain ?? '');
+  const [freshDns, setFreshDns] = useState<DnsRecord[] | null>(null);
+  const [savingDom, setSavingDom] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
+  // Show the just-returned records if present, else reconstruct them from the saved
+  // domain + token so a PENDING/FAILED domain's records survive a page reload.
+  const dnsRecords: DnsRecord[] | null = freshDns ?? (
+    vendor.customDomain && vendor.customDomainToken && status !== 'VERIFIED'
+      ? buildDnsRecords(vendor.customDomain, vendor.customDomainToken, APP_DOMAIN)
+      : null
+  );
+
+  async function addDomain(e: React.FormEvent) {
+    e.preventDefault();
+    const d = domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(d)) {
+      return toast.error('Enter a valid domain, e.g. shop.yourbrand.com');
+    }
+    setSavingDom(true);
+    try {
+      const res = await api<{ dns: DnsRecord[] }>('/api/vendors/me/custom-domain', {
+        method: 'POST', body: JSON.stringify({ domain: d }),
+      });
+      setFreshDns(res.dns);
+      toast.success('Domain saved — add the DNS records below, then verify.');
+      onSaved();
+    } catch { /* handled by api() */ }
+    finally { setSavingDom(false); }
+  }
+
+  async function verify() {
+    setVerifying(true);
+    try {
+      await api('/api/vendors/me/custom-domain/verify', { method: 'POST' });
+      toast.success('Domain verified — your store is now live on it.');
+      setFreshDns(null);
+      onSaved();
+    } catch { /* api() shows the precise reason: TXT missing / not routed yet */ }
+    finally { setVerifying(false); }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Free subdomain */}
+      <Card className="p-5">
+        <h2 className="font-semibold text-ink-900 mb-1">Free subdomain</h2>
+        <p className="text-xs text-ink-500 mb-4">Your shop gets a branded address on our domain — no DNS setup, SSL handled automatically.</p>
+
+        {vendor.subdomain && (
+          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+            Live at{' '}
+            <a className="font-mono font-semibold underline" href={`https://${vendor.subdomain}.${APP_DOMAIN}`} target="_blank" rel="noreferrer">
+              {vendor.subdomain}.{APP_DOMAIN}
+            </a>
+          </div>
+        )}
+
+        <form onSubmit={saveSubdomain} className="space-y-4">
+          <Field label="Subdomain" hint={`Your store will be at ${sub.trim() || 'your-shop'}.${APP_DOMAIN}`}>
+            <div className="flex items-center gap-2">
+              <input className="input-field font-mono flex-1" value={sub} maxLength={60}
+                placeholder="your-shop"
+                onChange={(e) => setSub(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
+              <span className="text-sm text-ink-500 font-mono whitespace-nowrap">.{APP_DOMAIN}</span>
+            </div>
+          </Field>
+          <button type="submit" disabled={savingSub} className="btn-primary">
+            {savingSub ? 'Saving…' : vendor.subdomain ? 'Update subdomain' : 'Claim subdomain'}
+          </button>
+        </form>
+      </Card>
+
+      {/* Custom domain */}
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold text-ink-900">Custom domain</h2>
+          <span className={`text-xs px-2.5 py-1 rounded-pill font-semibold ${badge.cls}`}>{badge.label}</span>
+        </div>
+        <p className="text-xs text-ink-500 mb-4">Use a domain you own (e.g. shop.yourbrand.com). Add a verification record, point it at us, then verify — we issue the SSL certificate automatically.</p>
+
+        {status === 'VERIFIED' && vendor.customDomain && (
+          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+            Verified and live at{' '}
+            <a className="font-mono font-semibold underline" href={`https://${vendor.customDomain}`} target="_blank" rel="noreferrer">
+              {vendor.customDomain}
+            </a>
+          </div>
+        )}
+
+        <form onSubmit={addDomain} className="space-y-4">
+          <Field label="Domain" hint="Enter the domain you own, without https://">
+            <input className="input-field font-mono" value={domain} maxLength={253}
+              placeholder="shop.yourbrand.com"
+              onChange={(e) => setDomain(e.target.value.toLowerCase())} />
+          </Field>
+          <button type="submit" disabled={savingDom} className="btn-primary">
+            {savingDom ? 'Saving…' : status === 'NONE' ? 'Add domain' : 'Update domain'}
+          </button>
+        </form>
+
+        {dnsRecords && (
+          <div className="mt-5 border-t border-line pt-4">
+            <h3 className="font-semibold text-ink-900 mb-1">Add these DNS records</h3>
+            <p className="text-xs text-ink-500 mb-3">Add them at your domain registrar / DNS provider, then click Verify. DNS changes can take a few minutes to propagate.</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-ink-500 border-b border-line">
+                    <th className="py-2 pr-3 font-semibold">Type</th>
+                    <th className="py-2 pr-3 font-semibold">Host / Name</th>
+                    <th className="py-2 font-semibold">Value</th>
+                  </tr>
+                </thead>
+                <tbody className="font-mono">
+                  {dnsRecords.map((r, i) => (
+                    <tr key={i} className="border-b border-line align-top">
+                      <td className="py-2 pr-3">{r.type}</td>
+                      <td className="py-2 pr-3 break-all">{r.host}</td>
+                      <td className="py-2 break-all">{Array.isArray(r.value) ? r.value.join(', ') : r.value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {status === 'FAILED' && (
+              <p className="text-xs text-danger mt-3">Last verification failed — double-check the records above (DNS may still be propagating) and try again.</p>
+            )}
+            <button type="button" onClick={verify} disabled={verifying} className="btn-primary mt-4">
+              {verifying ? 'Verifying…' : 'Verify domain'}
+            </button>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 }
 
