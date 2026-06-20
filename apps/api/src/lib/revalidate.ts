@@ -20,7 +20,13 @@ export async function notifyStorefrontRevalidate(vendorId: string): Promise<void
   const secret = process.env.REVALIDATE_SECRET;
   if (!list.length || !secret) return;
 
-  const tags = [`vendor:${vendorId}`, `vendor:${vendorId}:pages`];
+  // The storefront RSC fetches /brand by the routed param — the slug on a tenant host /
+  // clean URL, the UUID on path access. Tag BOTH so revalidation matches either key.
+  const vendor = await prisma.vendor
+    .findUnique({ where: { id: vendorId }, select: { slug: true } })
+    .catch(() => null);
+  const keys = vendor?.slug ? [vendorId, vendor.slug] : [vendorId];
+  const tags = keys.flatMap((k) => [`vendor:${k}`, `vendor:${k}:pages`]);
   await Promise.allSettled(
     list.map((base) =>
       fetch(`${base.replace(/\/+$/, '')}/api/revalidate`, {
