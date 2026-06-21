@@ -31,7 +31,9 @@ export default function VendorInventoryPage() {
     setLoading(true);
     try {
       const data = await api<InvProduct[]>('/api/products/vendor/mine');
-      setItems(data); setEdits({});
+      setItems(Array.isArray(data) ? data : []); setEdits({});
+    } catch {
+      setItems([]);
     } finally { setLoading(false); }
   }
   useEffect(() => { load(); }, []);

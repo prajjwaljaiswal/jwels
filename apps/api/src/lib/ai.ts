@@ -28,6 +28,65 @@ function extractJson(text: string): any {
   return JSON.parse(candidate!.slice(first));
 }
 
+// ── Support module: draft a reply for an agent to edit before sending ───────
+
+export interface SupportDraftContext {
+  subject: string;
+  category: string;
+  shopName?: string;
+  // Oldest→newest, public messages only (internal notes must not be passed in).
+  messages: Array<{ role: 'CUSTOMER' | 'VENDOR' | 'ADMIN' | 'SYSTEM'; authorName: string; body: string }>;
+}
+
+/**
+ * Generate a suggested support reply. Returns a `source` so the UI can label it
+ * as AI-assisted. Falls back to a neutral acknowledgement when no API key is
+ * configured or the call fails — the agent always gets *something* to edit.
+ */
+export async function draftSupportReply(
+  ctx: SupportDraftContext
+): Promise<{ draft: string; source: 'ai' | 'fallback' }> {
+  const c = client();
+  const last = [...ctx.messages].reverse().find((m) => m.role === 'CUSTOMER' || m.role === 'VENDOR');
+  const fallback = `Hi${last ? ` ${last.authorName.split(' ')[0]}` : ''}, thanks for reaching out about “${ctx.subject}”. ` +
+    `I'm looking into this for you now and will follow up with an update shortly. ` +
+    `Please let me know if there's anything else I can help with in the meantime.`;
+  if (!c) return { draft: fallback, source: 'fallback' };
+
+  const transcript = ctx.messages
+    .slice(-12)
+    .map((m) => `${m.role === 'CUSTOMER' ? 'Customer' : m.role === 'VENDOR' ? 'Seller' : m.role === 'ADMIN' ? 'Support agent' : 'System'} (${m.authorName}): ${m.body}`)
+    .join('\n');
+
+  const prompt = `You are a helpful customer-support agent${
+    ctx.shopName ? ` for the jewellery shop "${ctx.shopName}"` : ' for a jewellery marketplace'
+  }. Draft the next reply to the customer in this support thread.
+
+Ticket subject: ${ctx.subject}
+Category: ${ctx.category}
+
+Conversation so far (oldest first):
+${transcript}
+
+Write ONLY the reply text the agent should send — warm, concise (2-4 sentences), professional, and specific to the conversation. Do not invent order details, prices, refund amounts, or policies you don't see in the thread; if information is missing, ask for it. No greetings like "Dear Sir/Madam", no signature block, no markdown.`;
+
+  try {
+    const msg = await c.messages.create({
+      model: MODEL,
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const text = msg.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+      .trim();
+    return { draft: text || fallback, source: text ? 'ai' : 'fallback' };
+  } catch {
+    return { draft: fallback, source: 'fallback' };
+  }
+}
+
 export interface GeneratedTheme {
   colors: {
     primary: string;

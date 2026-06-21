@@ -84,7 +84,7 @@ export default function VendorDashboard() {
           setKpis(k);
         }
       } catch (e: any) {
-        if (e.message.includes('Vendor profile not created')) router.push('/onboard');
+        if (e.message.includes('Vendor profile not created')) router.push('/settings?tab=shop');
         else if (e.message.includes('Missing token')) router.push('/auth/login');
       } finally {
         setLoading(false);
@@ -112,7 +112,7 @@ export default function VendorDashboard() {
         </div>
         <h2 className="font-display text-2xl text-ink-900">Finish onboarding</h2>
         <p className="text-ink-700 mt-2 max-w-md mx-auto">Complete your shop profile, KYC, and bank details to start selling.</p>
-        <div className="mt-5"><Link href="/sell/onboard" className="btn-primary">Resume onboarding</Link></div>
+        <div className="mt-5"><Link href="/settings?tab=shop" className="btn-primary">Resume onboarding</Link></div>
       </Card>
     );
   }
@@ -137,7 +137,7 @@ export default function VendorDashboard() {
         <p className="text-ink-700 max-w-md mx-auto">{vendor.kycRejectionNote || 'Please review and resubmit your details.'}</p>
         <div className="mt-4 flex items-center justify-center gap-3">
           <StatusPill tone="danger">Rejected</StatusPill>
-          <Link href="/sell/onboard" className="btn-primary">Update & resubmit</Link>
+          <Link href="/settings?tab=business" className="btn-primary">Update & resubmit</Link>
         </div>
       </Card>
     );

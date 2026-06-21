@@ -1,9 +1,11 @@
 import 'dotenv/config';
 import express from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import { assertEncryptionKeyConfigured } from './lib/crypto';
 import { buildCorsOptions } from './lib/cors';
+import { initRealtime } from './lib/realtime';
 import { logger } from './lib/logger';
 
 assertEncryptionKeyConfigured();
@@ -39,9 +41,14 @@ import questionsRouter from './routes/questions';
 import collectionsRouter from './routes/collections';
 import fulfillmentRouter from './routes/fulfillment';
 import returnsRouter from './routes/returns';
+import marketingRouter from './routes/marketing';
+import adminMarketingRouter from './routes/adminMarketing';
+import supportRouter from './routes/support';
 import { startAbandonedCartJob } from './jobs/abandonedCart';
 import { startAutoDeliverJob } from './jobs/autoDeliver';
 import { startSettlementJob } from './jobs/settlement';
+import { startCatalogSyncJob } from './jobs/catalogSync';
+import { startSupportAutoCloseJob } from './jobs/supportAutoClose';
 
 const app = express();
 
@@ -96,6 +103,13 @@ app.use('/api/questions', questionsRouter);
 app.use('/api/collections', collectionsRouter);
 app.use('/api/fulfillment', fulfillmentRouter);
 app.use('/api/returns', returnsRouter);
+// Marketing hub — public product feed (feed.xml) + vendor self-serve catalog/status/sync.
+app.use('/api/marketing', marketingRouter);
+// Admin operator surface — manage any vendor's marketing on their behalf (per-route perms).
+app.use('/api/admin/marketing', adminMarketingRouter);
+// Support module — tickets + realtime chat (customer/vendor/admin). Realtime
+// notifications ride the socket.io server attached to the HTTP server below.
+app.use('/api/support', supportRouter);
 
 // Generic error handler
 app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -105,9 +119,17 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
 });
 
 const port = parseInt(process.env.PORT || '4000', 10);
-app.listen(port, () => {
+
+// Wrap the Express app in an explicit HTTP server so socket.io can share the
+// same port/listener (app.listen() hides the server instance socket.io needs).
+const httpServer = createServer(app);
+initRealtime(httpServer);
+
+httpServer.listen(port, () => {
   console.log(`API listening on http://localhost:${port}`);
   startAbandonedCartJob();
   startAutoDeliverJob();
   startSettlementJob();
+  startCatalogSyncJob();
+  startSupportAutoCloseJob();
 });

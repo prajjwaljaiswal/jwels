@@ -141,6 +141,55 @@ export async function sendRefundEmail(
   });
 }
 
+// ── Support module ────────────────────────────────────────────────────────
+
+function supportBtn(link: string, label = 'View conversation'): string {
+  return `<a href="${link}" style="display:inline-block;background:#F1641E;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px;margin-top:8px">${escapeHtml(
+    label
+  )}</a>`;
+}
+
+// Sent to the requester when their ticket is created.
+export async function sendSupportTicketReceivedEmail(
+  to: string,
+  data: { ticketNumber: string; subject: string; link: string }
+) {
+  await transporter.sendMail({
+    from: FROM,
+    to,
+    subject: `We've received your request — ${data.ticketNumber}`,
+    html: shell(
+      'Your support request is open',
+      `<p style="color:#555">Thanks for reaching out. Your request <strong>${escapeHtml(
+        data.ticketNumber
+      )}</strong> — “${escapeHtml(
+        data.subject
+      )}” — has been logged and our team will reply here shortly.</p>${supportBtn(data.link)}`
+    ),
+  });
+}
+
+// Sent to the counterpart when a new (non-internal) message lands on a ticket.
+export async function sendSupportMessageEmail(
+  to: string,
+  data: { ticketNumber: string; subject: string; fromName: string; preview: string; link: string }
+) {
+  await transporter.sendMail({
+    from: FROM,
+    to,
+    subject: `New reply on ${data.ticketNumber} — ${data.subject}`,
+    html: shell(
+      'You have a new message',
+      `<p style="color:#555"><strong>${escapeHtml(data.fromName)}</strong> replied on <strong>${escapeHtml(
+        data.ticketNumber
+      )}</strong>:</p>
+       <blockquote style="margin:12px 0;padding:10px 14px;border-left:3px solid #F1641E;color:#444;background:#faf7f4">${escapeHtml(
+         data.preview
+       )}</blockquote>${supportBtn(data.link, 'Reply')}`
+    ),
+  });
+}
+
 export async function sendOrderShippedEmail(
   to: string,
   data: { orderId: string; customerName: string; productName: string; carrier?: string | null; trackingNumber?: string | null; trackingUrl?: string | null }

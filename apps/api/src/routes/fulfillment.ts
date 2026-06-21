@@ -1,12 +1,12 @@
 import { Router } from 'express';
+import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { Role, OrderStatus, ShipmentStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { decryptJson } from '../lib/crypto';
 import { getCarrier } from '../lib/carriers';
-import { sendOrderShippedEmail, sendOrderDeliveredEmail } from '../lib/email';
-import { sendWhatsApp } from '../lib/whatsapp';
+import { markItemShipped, markItemDelivered } from '../lib/fulfillmentSync';
 
 const router = Router();
 
@@ -14,62 +14,9 @@ async function getVendor(userId: string) {
   return prisma.vendor.findUnique({ where: { userId } });
 }
 
-/** Best-effort "your order has shipped" email. Never throws. */
-async function notifyShipped(shipmentId: string): Promise<void> {
-  try {
-    const s = await prisma.shipment.findUnique({
-      where: { id: shipmentId },
-      include: {
-        orderItem: {
-          include: {
-            product: { select: { name: true } },
-            order: { select: { id: true, customer: { select: { email: true, name: true, phone: true } } } },
-          },
-        },
-      },
-    });
-    const customer = s?.orderItem?.order?.customer;
-    if (!customer?.email) return;
-    await sendOrderShippedEmail(customer.email, {
-      orderId: s!.orderItem.order.id,
-      customerName: customer.name || 'there',
-      productName: s!.orderItem.product?.name ?? 'Your item',
-      carrier: s!.carrierName,
-      trackingNumber: s!.awb,
-    });
-    if (customer.phone) {
-      void sendWhatsApp(customer.phone, `Your order #${s!.orderItem.order.id.slice(0, 8).toUpperCase()} has shipped via ${s!.carrierName}${s!.awb ? ` (AWB ${s!.awb})` : ''}. Track it in your account.`);
-    }
-  } catch (e: any) {
-    console.warn('[email] shipped notification failed:', e?.message);
-  }
-}
-
-/** Best-effort "delivered" notification. Never throws. */
-async function notifyDelivered(shipmentId: string): Promise<void> {
-  try {
-    const s = await prisma.shipment.findUnique({
-      where: { id: shipmentId },
-      include: {
-        orderItem: {
-          include: {
-            product: { select: { name: true } },
-            order: { select: { id: true, customer: { select: { email: true, name: true, phone: true } } } },
-          },
-        },
-      },
-    });
-    const customer = s?.orderItem?.order?.customer;
-    if (!customer?.email) return;
-    await sendOrderDeliveredEmail(customer.email, {
-      orderId: s!.orderItem.order.id,
-      customerName: customer.name || 'there',
-      productName: s!.orderItem.product?.name ?? 'Your item',
-    });
-  } catch (e: any) {
-    console.warn('[email] delivered notification failed:', e?.message);
-  }
-}
+// Customer shipped/delivered notifications and the OrderItem ⇄ Shipment status
+// sync now live in ../lib/fulfillmentSync (markItemShipped / markItemDelivered),
+// shared across every dispatch path so the customer is notified exactly once.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status transition whitelist
@@ -219,6 +166,12 @@ router.post(
           declaredValue: Number(item.priceAtPurchase) * item.quantity,
         },
       });
+
+      // Generating the label/AWB is the dispatch action in this flow: advance the
+      // order item to SHIPPED so the customer sees progress, the payout pipeline
+      // picks it up, and the shipped notification fires. The shipment itself stays
+      // at LABEL_GENERATED so it remains eligible for the manifest/pickup workflow.
+      await markItemShipped(item.id);
 
       res.status(201).json(shipment);
     } catch (e) { next(e); }
@@ -378,33 +331,28 @@ router.patch(
         });
       }
 
-      const now = new Date();
       const newStatus = parsed.data.status;
 
-      // Determine OrderItem sync
-      let itemData: Record<string, unknown> | null = null;
+      // Update the shipment first, then sync the order item through the shared
+      // transition helpers. They are the single notification source and are
+      // idempotent, so no duplicate "shipped" email fires if the item was already
+      // dispatched via another path (e.g. label generation).
+      const updated = await prisma.shipment.update({
+        where: { id: shipment.id },
+        data: { status: newStatus },
+        include: { trackingEvents: { orderBy: { eventTime: 'desc' } } },
+      });
+
       if (newStatus === 'IN_TRANSIT') {
-        itemData = { status: OrderStatus.SHIPPED, dispatchedAt: now };
+        await markItemShipped(shipment.orderItemId);
       } else if (newStatus === 'DELIVERED') {
-        itemData = { status: OrderStatus.DELIVERED, deliveredAt: now };
-      } else if (newStatus === 'RTO_DELIVERED' || (newStatus === 'CANCELLED' && !['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'].includes(shipment.status))) {
-        itemData = { status: OrderStatus.CANCELLED };
+        await markItemDelivered(shipment.orderItemId);
+      } else if (
+        newStatus === 'RTO_DELIVERED' ||
+        (newStatus === 'CANCELLED' && !['IN_TRANSIT', 'OUT_FOR_DELIVERY', 'PICKED_UP'].includes(shipment.status))
+      ) {
+        await prisma.orderItem.update({ where: { id: shipment.orderItemId }, data: { status: OrderStatus.CANCELLED } });
       }
-
-      const [updated] = await prisma.$transaction([
-        prisma.shipment.update({
-          where: { id: shipment.id },
-          data: { status: newStatus },
-          include: { trackingEvents: { orderBy: { eventTime: 'desc' } } },
-        }),
-        ...(itemData
-          ? [prisma.orderItem.update({ where: { id: shipment.orderItemId }, data: itemData })]
-          : []),
-      ]);
-
-      // Notify the customer on dispatch and delivery (best-effort).
-      if (newStatus === 'IN_TRANSIT') void notifyShipped(shipment.id);
-      else if (newStatus === 'DELIVERED') void notifyDelivered(shipment.id);
 
       res.json(updated);
     } catch (e) { next(e); }
@@ -755,17 +703,56 @@ router.get('/tracking/:awb', requireAuth, requireRole(Role.VENDOR), async (req, 
 // POST /api/fulfillment/carrier/webhook  (carrier push events)
 // ─────────────────────────────────────────────────────────────────────────────
 
+function safeEqual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  // Length check first; timingSafeEqual throws on length mismatch.
+  return ba.length === bb.length && timingSafeEqual(ba, bb);
+}
+
+// Authenticate a carrier push. Secret comes from CARRIER_WEBHOOK_SECRET and may be
+// sent via the x-webhook-secret header or a ?secret= query param (some carrier
+// portals only allow configuring a URL). Returns an HTTP status to respond with,
+// or null when authorized. If the secret is not configured the endpoint is
+// disabled (503) rather than accepting unauthenticated writes.
+function authorizeWebhook(req: any): { status: number; error: string } | null {
+  const expected = process.env.CARRIER_WEBHOOK_SECRET;
+  if (!expected) return { status: 503, error: 'Carrier webhook is not configured' };
+  const provided =
+    (req.headers['x-webhook-secret'] as string | undefined) ??
+    (typeof req.query?.secret === 'string' ? (req.query.secret as string) : undefined);
+  if (!provided || !safeEqual(provided, expected)) {
+    return { status: 401, error: 'Invalid or missing webhook secret' };
+  }
+  return null;
+}
+
+const webhookSchema = z.object({
+  awb: z.string().min(1),
+  events: z.array(z.object({
+    name:        z.string().min(1),
+    description: z.string().optional(),
+    time:        z.string().optional(),
+    location:    z.string().optional(),
+  })).min(1),
+});
+
+// Pre-transit shipment statuses that a live "in transit" event may fast-forward.
+const PRE_TRANSIT: ShipmentStatus[] = [
+  ShipmentStatus.LABEL_GENERATED,
+  ShipmentStatus.MANIFEST_GENERATED,
+  ShipmentStatus.PICKUP_SCHEDULED,
+  ShipmentStatus.PICKED_UP,
+];
+
 router.post('/carrier/webhook', async (req, res, next) => {
   try {
-    const carrierName = (req.headers['x-carrier-name'] as string | undefined)?.toUpperCase();
-    const { awb, events } = req.body as {
-      awb: string;
-      events: Array<{ name: string; description?: string; time: string; location?: string }>;
-    };
+    const denied = authorizeWebhook(req);
+    if (denied) return res.status(denied.status).json({ error: denied.error });
 
-    if (!awb || !Array.isArray(events)) {
-      return res.status(400).json({ error: 'awb and events[] required' });
-    }
+    const parsed = webhookSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const { awb, events } = parsed.data;
 
     const shipment = await prisma.shipment.findFirst({ where: { awb } });
     if (!shipment) return res.status(404).json({ error: 'Shipment not found' });
@@ -775,14 +762,33 @@ router.post('/carrier/webhook', async (req, res, next) => {
         shipmentId:       shipment.id,
         eventName:        e.name,
         eventDescription: e.description,
-        eventTime:        new Date(e.time),
+        eventTime:        e.time && !Number.isNaN(Date.parse(e.time)) ? new Date(e.time) : new Date(),
         eventLocation:    e.location,
         rawPayload:       req.body,
       })),
       skipDuplicates: true,
     });
 
-    res.json({ received: created.count });
+    // Advance order/shipment status from the events so a real carrier push closes
+    // the order, feeds payouts, and notifies the customer (via the shared helpers).
+    const text = events.map((e) => `${e.name} ${e.description ?? ''}`).join(' ').toLowerCase();
+    let transition: 'delivered' | 'rto' | 'shipped' | null = null;
+    if (/deliver/.test(text)) transition = 'delivered';
+    else if (/\brto\b|return to origin|undelivered|returned/.test(text)) transition = 'rto';
+    else if (/out for delivery|in[\s-]?transit|dispatch|shipped|picked[\s-]?up/.test(text)) transition = 'shipped';
+
+    if (transition === 'delivered') {
+      await markItemDelivered(shipment.orderItemId); // also drives the shipment to DELIVERED
+    } else if (transition === 'shipped') {
+      if (PRE_TRANSIT.includes(shipment.status)) {
+        await prisma.shipment.update({ where: { id: shipment.id }, data: { status: ShipmentStatus.IN_TRANSIT } });
+      }
+      await markItemShipped(shipment.orderItemId);
+    } else if (transition === 'rto' && shipment.status !== ShipmentStatus.RTO_DELIVERED && shipment.status !== ShipmentStatus.CANCELLED) {
+      await prisma.shipment.update({ where: { id: shipment.id }, data: { status: ShipmentStatus.RTO_INITIATED } });
+    }
+
+    res.json({ received: created.count, transition });
   } catch (e) { next(e); }
 });
 

@@ -88,7 +88,8 @@ export default function VendorOrdersPage() {
 
   useEffect(() => {
     api<OrderItem[]>('/api/vendors/me/orders')
-      .then(setItems)
+      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }, []);
 

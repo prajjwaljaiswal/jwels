@@ -65,6 +65,18 @@ function isAllowedCustomDomain(origin: string): boolean {
   return customDomainCache.has(origin);
 }
 
+/**
+ * Origin predicate reused by the socket.io server so realtime shares the REST
+ * CORS allowlist. Mirrors buildCorsOptions' philosophy: if nothing is
+ * configured, stay permissive (an un-configured deploy is never broken).
+ */
+export function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true; // non-browser / same-origin clients
+  const allowlist = staticAllowlist();
+  if (allowlist.length === 0) return true; // un-configured deploy = permissive
+  return allowlist.includes(origin) || isAllowedCustomDomain(origin);
+}
+
 export function buildCorsOptions(): CorsOptions {
   const allowlist = staticAllowlist();
   const configured = !!process.env.CORS_ALLOWED_ORIGINS || allowlist.length > 0;

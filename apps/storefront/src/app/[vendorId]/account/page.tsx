@@ -151,6 +151,12 @@ export default function VendorAccountPage() {
           >
             Orders from {vendor.shopName}
           </Link>
+          <Link href={`${basePath}/account/support`}
+            className="px-4 py-2 rounded-pill border font-semibold text-sm transition-colors hover:bg-canvas"
+            style={{ borderColor: theme, color: theme }}
+          >
+            Messages &amp; help
+          </Link>
           <Link href={(basePath || '/')}
             className="px-4 py-2 rounded-pill border font-semibold text-sm transition-colors hover:bg-canvas"
             style={{ borderColor: theme, color: theme }}

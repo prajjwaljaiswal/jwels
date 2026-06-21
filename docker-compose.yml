@@ -1,0 +1,26 @@
+# Local development Postgres for the vrindaonline marketplace.
+# Usage:
+#   docker compose up -d        # start
+#   docker compose down         # stop (keeps data in the named volume)
+#   docker compose down -v      # stop and wipe data
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jewel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jewel
+      POSTGRES_PASSWORD: jewel
+      POSTGRES_DB: jewel
+    ports:
+      - "5432:5432"
+    volumes:
+      - jewel_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jewel -d jewel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  jewel_pgdata:

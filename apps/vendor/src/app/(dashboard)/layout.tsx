@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardShell, Icons, type NavItem } from '@/components/dashboard/DashboardShell';
 import { ProfileMenu } from '@/components/dashboard/ProfileMenu';
+import { NotificationBell } from '@/components/support/NotificationBell';
 import { useMe } from '@/lib/permissions';
+import { NotificationsProvider } from '@/lib/realtime/NotificationsProvider';
 import { setToken } from '@/lib/api';
 
 const NAV: NavItem[] = [
@@ -18,6 +20,7 @@ const NAV: NavItem[] = [
   { label: 'Storefront',      href: '/storefront',     icon: Icons.Star,     match: (p) => p.startsWith('/storefront') },
   { label: 'Return policies', href: '/policies',       icon: Icons.Settings, match: (p) => p.startsWith('/policies') },
   { label: 'Orders',          href: '/orders',         icon: Icons.Box,      match: (p) => p.startsWith('/orders') },
+  { label: 'Support',         href: '/support',        icon: Icons.Bell,     match: (p) => p.startsWith('/support') },
   { label: 'Returns',         href: '/returns',        icon: Icons.Box,      match: (p) => p.startsWith('/returns') },
   { label: 'Dispatch',        href: '/dispatch',       icon: Icons.Box,      match: (p) => p.startsWith('/dispatch') },
   { label: 'Manifest',        href: '/manifest',       icon: Icons.Layers,   match: (p) => p.startsWith('/manifest') },
@@ -45,22 +48,22 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <DashboardShell
-      brand={{ title: 'Vendor', subtitle: 'Shop manager', href: '/' }}
-      nav={NAV}
-      topRight={
-        <div className="flex items-center gap-2">
-          <Link href="/storefront" className="hidden md:inline text-sm text-ink-700 hover:text-brand-700">
-            Storefront ↗
-          </Link>
-          <button className="h-9 w-9 rounded-md hover:bg-canvas flex items-center justify-center text-ink-700" aria-label="Notifications">
-            {Icons.Bell}
-          </button>
-          <ProfileMenu variant="vendor" />
-        </div>
-      }
-    >
-      {children}
-    </DashboardShell>
+    <NotificationsProvider>
+      <DashboardShell
+        brand={{ title: 'Vendor', subtitle: 'Shop manager', href: '/' }}
+        nav={NAV}
+        topRight={
+          <div className="flex items-center gap-2">
+            <Link href="/storefront" className="hidden md:inline text-sm text-ink-700 hover:text-brand-700">
+              Storefront ↗
+            </Link>
+            <NotificationBell baseHref="/support" pathTemplate="/support/{id}" />
+            <ProfileMenu variant="vendor" />
+          </div>
+        }
+      >
+        {children}
+      </DashboardShell>
+    </NotificationsProvider>
   );
 }

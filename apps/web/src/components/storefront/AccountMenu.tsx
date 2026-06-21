@@ -95,6 +95,7 @@ export function AccountMenu() {
           </div>
           <Link href={accountHref}   onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-canvas">My account</Link>
           <Link href={ordersHref}    onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-canvas">My orders</Link>
+          <Link href="/account/support" onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-canvas">Messages</Link>
           <Link href={wishlistHref}  onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-canvas">Wishlist</Link>
           <Link href={addressesHref} onClick={() => setOpen(false)} className="block px-4 py-2 text-sm hover:bg-canvas">Addresses</Link>
           {me.role === 'VENDOR' && (

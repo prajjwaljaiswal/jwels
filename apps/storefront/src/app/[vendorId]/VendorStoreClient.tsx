@@ -8,7 +8,9 @@ import {
   VendorProvider, VendorBrand, FONT_STACKS, useVendor, SocialPlatform,
 } from '@/lib/vendor-context';
 import { AccountMenu } from '@/components/storefront/AccountMenu';
+import { NotificationBell } from '@/components/support/NotificationBell';
 import { SearchAutosuggest } from '@/components/search/SearchAutosuggest';
+import { NotificationsProvider } from '@/lib/realtime/NotificationsProvider';
 
 const ALGOLIA_READY =
   !!process.env.NEXT_PUBLIC_ALGOLIA_APP_ID && !!process.env.NEXT_PUBLIC_ALGOLIA_SEARCH_KEY;
@@ -32,7 +34,9 @@ export default function VendorStoreClient({
 }) {
   return (
     <VendorProvider vendor={vendor} isCustomHost={isCustomHost}>
-      <ThemedShell>{children}</ThemedShell>
+      <NotificationsProvider>
+        <ThemedShell>{children}</ThemedShell>
+      </NotificationsProvider>
     </VendorProvider>
   );
 }
@@ -191,6 +195,7 @@ function Header() {
 
           {/* Account + cart — pushed right on mobile (search lives on its own row) */}
           <div className="ml-auto flex items-center gap-1 sm:gap-2 shrink-0" style={{ color: t.colors.headerText }}>
+            <NotificationBell baseHref={`${basePath}/account/support`} pathTemplate={`${basePath}/account/support/{id}`} />
             <AccountMenu storeKey={storeKey} basePath={basePath} />
             <Link
               href={`${basePath}/cart`}
