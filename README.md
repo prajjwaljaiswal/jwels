@@ -11,7 +11,9 @@ A multi-vendor jewellery e-commerce platform (B2C, Flipkart/Amazon-style). Vendo
 - **Images/media:** Cloudinary
 - **Payments:** Razorpay
 - **Search:** Algolia (react-instantsearch on the storefront app)
-- **Email:** nodemailer (SMTP)
+- **Realtime:** socket.io (shares the API's HTTP server) — powers support chat and live notifications
+- **Notifications:** nodemailer (SMTP email), web-push (browser push), WhatsApp
+- **Invoices:** pdfkit (server-rendered PDF order invoices)
 - **AI (optional):** Anthropic SDK — powers page-block / theme generation in the vendor storefront builder
 
 ## Project structure
@@ -99,7 +101,10 @@ The seed also creates system RBAC roles (`SUPER_ADMIN`, `VENDOR_MODERATOR`, `FIN
 3. **Vendor builds their storefront** — page-builder blocks, theme, mega-menu — served by the standalone `storefront` app.
 4. **Customer browses** the marketplace, adds to cart (single-vendor rule), and checks out via Razorpay.
 5. **Vendor manages orders** — marks items shipped/delivered; an auto-deliver background job advances stale shipments.
-6. **Admin handles payouts** — the payouts view shows the balance owed per vendor (gross minus platform commission).
+6. **Returns** — customers request returns/refunds, which vendors and admins process.
+7. **Support** — customers, vendors, and admins exchange messages on tickets via realtime chat; a background job auto-closes stale tickets.
+8. **Marketing** — vendors manage a self-serve marketing hub and a public product feed (`feed.xml`); admins can operate any vendor's marketing on their behalf.
+9. **Admin handles payouts** — the payouts view shows the balance owed per vendor (gross minus platform commission), settled via a manual-settlement ledger.
 
 ## Production
 

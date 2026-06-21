@@ -71,11 +71,15 @@ Express REST API mounted at `/api/*` (route-to-mount mapping lives in `src/index
 - `cart.ts`, `wishlist.ts`, `addresses.ts` — server-side persistence synced from the frontend Zustand stores
 - `categories.ts`, `collections.ts`, `coupons.ts`, `reviews.ts`, `questions.ts` — catalog & merchandising
 - `vendorPages.ts` — page-builder pages; exports both the authed router and a `publicRouter` mounted at `/api/storefront-pages` for the storefront app
-- `shipping.ts`, `fulfillment.ts`, `payments.ts`, `assets.ts` (vendor media library, mounted under `/api/vendors`), `settings.ts`
+- `shipping.ts`, `fulfillment.ts`, `returns.ts`, `payments.ts`, `assets.ts` (vendor media library, mounted under `/api/vendors`), `settings.ts`
+- `marketing.ts` — vendor self-serve marketing hub + public product feed (`feed.xml`); `adminMarketing.ts` mounted at `/api/admin/marketing` is the admin operator surface (per-route perms) to manage any vendor's marketing
+- `support.ts` — support tickets + realtime chat (customer/vendor/admin); realtime notifications ride the socket.io server
 
-`src/middleware/auth.ts` provides JWT verification and role-based guards (CUSTOMER / VENDOR / ADMIN). `src/lib/` exports singletons and helpers: `prisma`, `cloudinary`, `jwt`, `razorpay`, plus `crypto.ts` (field-level encryption — `assertEncryptionKeyConfigured()` runs at boot and aborts if `ENCRYPTION_KEY` is unset), `algolia.ts` (search index sync), `ai.ts` (Anthropic SDK), `email.ts` (nodemailer), `audit.ts`, `coupon.ts`, `shipping.ts`, `vendor-slug.ts`, `themePresets.ts`, `blockSchemas.ts`.
+The Express app is wrapped in an explicit `http.createServer` so **socket.io** (`src/lib/realtime.ts`, `initRealtime`) shares the same port. Boot order: `assertEncryptionKeyConfigured()` first, then helmet (CSP off — API returns JSON only) + CORS (`src/lib/cors.ts`) + `express-rate-limit`. The raw request body is captured (`req.rawBody`) so webhook handlers can verify Razorpay HMAC signatures over the exact signed bytes. A top-level `unhandledRejection` handler swallows transient PgBouncer "connection closed" errors so Prisma can auto-reconnect.
 
-`src/jobs/` holds setInterval-based background jobs started in `index.ts` on listen: `abandonedCart.ts` and `autoDeliver.ts`.
+`src/middleware/auth.ts` provides JWT verification and role-based guards (CUSTOMER / VENDOR / ADMIN). `src/lib/` exports singletons and helpers: `prisma`, `cloudinary`, `jwt`, `razorpay`, plus `crypto.ts` (field-level encryption — `assertEncryptionKeyConfigured()` runs at boot and aborts if `ENCRYPTION_KEY` is unset), `algolia.ts` (search index sync), `ai.ts` (Anthropic SDK), `email.ts` (nodemailer), `push.ts` (web-push), `whatsapp.ts`, `invoice.ts` (pdfkit PDF invoices), `payouts.ts` (manual-settlement ledger; pluggable provider later), `realtime.ts` (socket.io), `logger.ts` (pino), `revalidate.ts` (Next.js ISR triggers), `orderConfirm.ts`, `fulfillmentSync.ts`, `audit.ts`, `coupon.ts`, `shipping.ts`, `states.ts`, `support-access.ts`, `vendor-slug.ts`, `themePresets.ts`, `blockSchemas.ts`.
+
+`src/jobs/` holds setInterval-based background jobs started in `index.ts` on listen: `abandonedCart.ts`, `autoDeliver.ts`, `settlement.ts`, `catalogSync.ts`, `supportAutoClose.ts`.
 
 **Database:** PostgreSQL via Prisma 5. Schema at `apps/api/prisma/schema.prisma`. Key relationships: User → Vendor (optional, one-to-one) → Products; User → Orders → OrderItems → Product + Vendor. OrderItem has its own status field to support split-vendor shipping.
 
