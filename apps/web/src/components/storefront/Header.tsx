@@ -15,21 +15,21 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
-      <div className="max-w-container mx-auto px-6 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
         <Link href="/" className="flex items-center gap-1 shrink-0" aria-label="Vrindaonline home">
           <Logo />
         </Link>
 
-        <nav className="flex items-center gap-3 sm:gap-5 text-sm">
+        <nav className="flex items-center gap-2 sm:gap-5 text-sm shrink-0">
           <Link href="/how-it-works" className="hidden sm:inline font-medium text-ink-700 hover:text-brand-700">
             {t('How it works', 'कैसे काम करता है')}
           </Link>
-          <Link href="/sell/login" className="font-medium text-ink-700 hover:text-brand-700">
+          <Link href="/sell/login" className="hidden sm:inline font-medium text-ink-700 hover:text-brand-700 whitespace-nowrap">
             {t('Log in', 'लॉग इन')}
           </Link>
           <Link
             href="/sell/register"
-            className="inline-flex items-center rounded-pill bg-brand-600 text-white font-semibold px-4 py-2 hover:bg-brand-700 transition"
+            className="hidden sm:inline-flex items-center rounded-pill bg-brand-600 text-white font-semibold text-xs sm:text-sm px-3.5 sm:px-4 py-2 hover:bg-brand-700 transition whitespace-nowrap"
           >
             {t('Start selling', 'बेचना शुरू करें')}
           </Link>

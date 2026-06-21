@@ -101,14 +101,14 @@ export default function VendorLandingPage() {
           }} />
 
           {/* inline header */}
-          <div className="absolute top-6 left-0 right-0 z-20">
-            <div className="max-w-container mx-auto px-6 flex items-center justify-between">
-              <Logo textClassName="font-display text-3xl text-brand-600 leading-none drop-shadow-sm" />
-              <div className="flex items-center gap-3">
+          <div className="absolute top-5 sm:top-6 left-0 right-0 z-20">
+            <div className="max-w-container mx-auto px-4 sm:px-6 flex items-center justify-between gap-2">
+              <Logo textClassName="font-display text-2xl sm:text-3xl text-brand-600 leading-none drop-shadow-sm" />
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <Link href="/sell/login" className="hidden sm:inline text-sm font-medium text-ink-900 hover:text-brand-700 transition-colors px-3 py-2">
                   {t('Log in', 'लॉग इन')}
                 </Link>
-                <Link href="/sell/register" className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-pill bg-brand-600 text-white px-4 py-2 hover:bg-brand-700 transition">
+                <Link href="/sell/register" className="hidden sm:inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold rounded-pill bg-brand-600 text-white px-3.5 sm:px-4 py-2 hover:bg-brand-700 transition whitespace-nowrap">
                   {t('Start selling', 'बेचना शुरू करें')}
                 </Link>
                 <LanguageToggle />
@@ -254,7 +254,7 @@ export default function VendorLandingPage() {
           <Reveal direction="left" className="md:col-span-6 relative h-[520px] md:h-[640px]">
             <Parallax speed={0.18} className="h-full">
               <div className="relative h-full w-full rounded-2xl overflow-hidden shadow-pop">
-                <img src="https://images.unsplash.com/photo-1556228720-195a672e8a03?w=1200&q=80" alt="Artisan crafting jewelry" className="absolute inset-0 h-full w-full object-cover" />
+                <img src="/jwels.avif" alt="Artisan shaping a piece of jewellery by hand in a warm workshop setting with tools visible" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-tr from-ink-900/55 via-transparent to-transparent" />
               </div>
             </Parallax>
