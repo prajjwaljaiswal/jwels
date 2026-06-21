@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { api } from '@/lib/api';
+import { useLang } from '@/lib/i18n';
 
 const STEPS = [
   { n: 1, title: 'Your shop',         desc: 'Name and pitch' },
@@ -26,10 +27,20 @@ type Onboarding = {
 };
 
 export default function SellOnboardPage() {
+  const { t } = useLang();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [state, setState] = useState<Onboarding | null>(null);
   const [step, setStep] = useState<number>(1);
+
+  const STEP_LABELS: Record<number, { title: string; desc: string }> = {
+    1: { title: t('Your shop', 'आपकी दुकान'), desc: t('Name and pitch', 'नाम और परिचय') },
+    2: { title: t('Business details', 'व्यापार विवरण'), desc: t('PAN, GSTIN, type', 'पैन, जीएसटीआईएन, प्रकार') },
+    3: { title: t('Bank for payouts', 'भुगतान के लिए बैंक'), desc: t('Where we send earnings', 'जहाँ हम कमाई भेजते हैं') },
+    4: { title: t('Pickup address', 'पिकअप पता'), desc: t('Where couriers collect', 'जहाँ से कूरियर सामान लेता है') },
+    5: { title: t('Brand your shop', 'अपनी दुकान को सजाएँ'), desc: t('Logo, banner, theme', 'लोगो, बैनर, थीम') },
+    6: { title: t('Verify identity', 'पहचान सत्यापित करें'), desc: t('Upload ID document', 'पहचान दस्तावेज़ अपलोड करें') },
+  };
 
   async function refresh() {
     const ob = await api<Onboarding>('/api/vendors/me/onboarding');
@@ -59,9 +70,9 @@ export default function SellOnboardPage() {
   return (
     <div className="max-w-container mx-auto px-6 py-10">
       <div className="mb-8">
-        <h1 className="font-display text-3xl text-ink-900">Set up your shop</h1>
+        <h1 className="font-display text-3xl text-ink-900">{t('Set up your shop', 'अपनी दुकान सेट करें')}</h1>
         <p className="text-ink-700 mt-1.5">
-          {state.completed} of {state.total} steps complete. Save and resume any time.
+          {state.completed} / {state.total} {t('steps complete. Save and resume any time.', 'चरण पूरे। कभी भी सहेजें और फिर से शुरू करें।')}
         </p>
         <div className="mt-3 h-2 w-full max-w-md rounded-pill bg-canvas overflow-hidden">
           <div className="h-full bg-brand-700 transition-all" style={{ width: `${(state.completed / state.total) * 100}%` }} />
@@ -89,8 +100,8 @@ export default function SellOnboardPage() {
                   {done ? '✓' : s.n}
                 </span>
                 <span>
-                  <div className="font-semibold text-sm text-ink-900">{s.title}</div>
-                  <div className="text-xs text-ink-500">{s.desc}</div>
+                  <div className="font-semibold text-sm text-ink-900">{STEP_LABELS[s.n].title}</div>
+                  <div className="text-xs text-ink-500">{STEP_LABELS[s.n].desc}</div>
                 </span>
               </button>
             );
@@ -112,7 +123,7 @@ export default function SellOnboardPage() {
               disabled={step === 1}
               className="btn-secondary disabled:opacity-40"
             >
-              ← Back
+              ← {t('Back', 'पीछे')}
             </button>
             <button
               type="button"
@@ -120,7 +131,7 @@ export default function SellOnboardPage() {
               disabled={step === 6}
               className="btn-secondary disabled:opacity-40"
             >
-              Skip to next →
+              {t('Skip to next', 'अगले पर जाएँ')} →
             </button>
           </div>
         </div>
@@ -131,6 +142,7 @@ export default function SellOnboardPage() {
 
 // ── STEP 1 ───────────────────────────────────────────────────────────────────
 function StepShop({ vendor, onDone }: { vendor: any; onDone: () => void }) {
+  const { t } = useLang();
   const [f, setF] = useState({
     shopName: vendor?.shopName && vendor.shopName !== 'Untitled shop' ? vendor.shopName : '',
     tagline: vendor?.tagline ?? '',
@@ -142,34 +154,35 @@ function StepShop({ vendor, onDone }: { vendor: any; onDone: () => void }) {
     setBusy(true);
     try {
       await api('/api/vendors/onboard/step/1', { method: 'PATCH', body: JSON.stringify(f) });
-      toast.success('Shop details saved');
+      toast.success(t('Shop details saved', 'दुकान विवरण सहेजा गया'));
       onDone();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
   return (
     <form onSubmit={save} className="space-y-5">
-      <h2 className="font-display text-2xl text-ink-900">Tell us about your shop</h2>
-      <Field label="Shop name" required>
-        <input className="input-field" required minLength={2} placeholder="e.g. Aanya Fine Jewelry"
+      <h2 className="font-display text-2xl text-ink-900">{t('Tell us about your shop', 'अपनी दुकान के बारे में बताएँ')}</h2>
+      <Field label={t('Shop name', 'दुकान का नाम')} required>
+        <input className="input-field" required minLength={2} placeholder={t('e.g. Aanya Fine Jewelry', 'जैसे आन्या फाइन ज्वेलरी')}
           value={f.shopName} onChange={(e) => setF({ ...f, shopName: e.target.value })} />
       </Field>
-      <Field label="Tagline">
-        <input className="input-field" maxLength={120} placeholder="Handcrafted silver, made in Jaipur"
+      <Field label={t('Tagline', 'टैगलाइन')}>
+        <input className="input-field" maxLength={120} placeholder={t('Handcrafted silver, made in Jaipur', 'हस्तनिर्मित चाँदी, जयपुर में बनी')}
           value={f.tagline} onChange={(e) => setF({ ...f, tagline: e.target.value })} />
       </Field>
-      <Field label="About your shop">
+      <Field label={t('About your shop', 'आपकी दुकान के बारे में')}>
         <textarea className="input-field h-32 py-3" rows={4} maxLength={1000}
-          placeholder="Share your craft, materials, and what makes your pieces special."
+          placeholder={t('Share your craft, materials, and what makes your pieces special.', 'अपनी कारीगरी, सामग्री और अपने आभूषणों की खासियत बताएँ।')}
           value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} />
       </Field>
-      <button disabled={busy} className="btn-primary">{busy ? 'Saving…' : 'Save & continue'}</button>
+      <button disabled={busy} className="btn-primary">{busy ? t('Saving…', 'सहेज रहे हैं…') : t('Save & continue', 'सहेजें और आगे बढ़ें')}</button>
     </form>
   );
 }
 
 // ── STEP 2 ───────────────────────────────────────────────────────────────────
 function StepBusiness({ vendor, onDone }: { vendor: any; onDone: () => void }) {
+  const { t } = useLang();
   const [f, setF] = useState({
     businessType: vendor?.businessType ?? 'INDIVIDUAL',
     legalName: vendor?.legalName ?? '',
@@ -184,7 +197,7 @@ function StepBusiness({ vendor, onDone }: { vendor: any; onDone: () => void }) {
     setBusy(true);
     try {
       await api('/api/vendors/onboard/step/2', { method: 'PATCH', body: JSON.stringify(f) });
-      toast.success('Business details saved');
+      toast.success(t('Business details saved', 'व्यापार विवरण सहेजा गया'));
       onDone();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
@@ -192,29 +205,29 @@ function StepBusiness({ vendor, onDone }: { vendor: any; onDone: () => void }) {
 
   return (
     <form onSubmit={save} className="space-y-5">
-      <h2 className="font-display text-2xl text-ink-900">Business details</h2>
-      <p className="text-sm text-ink-700 -mt-2">PAN is stored encrypted. Required by Indian tax law for marketplace sellers.</p>
+      <h2 className="font-display text-2xl text-ink-900">{t('Business details', 'व्यापार विवरण')}</h2>
+      <p className="text-sm text-ink-700 -mt-2">{t('PAN is stored encrypted. Required by Indian tax law for marketplace sellers.', 'पैन एन्क्रिप्टेड रूप में सुरक्षित रहता है। मार्केटप्लेस विक्रेताओं के लिए भारतीय कर कानून के तहत आवश्यक।')}</p>
 
-      <Field label="Business type" required>
+      <Field label={t('Business type', 'व्यापार का प्रकार')} required>
         <select className="input-field" value={f.businessType}
           onChange={(e) => setF({ ...f, businessType: e.target.value })}>
-          <option value="INDIVIDUAL">Individual / Sole seller</option>
-          <option value="PROPRIETORSHIP">Proprietorship</option>
-          <option value="PARTNERSHIP">Partnership firm</option>
-          <option value="PRIVATE_LIMITED">Private Limited</option>
-          <option value="LLP">LLP</option>
+          <option value="INDIVIDUAL">{t('Individual / Sole seller', 'व्यक्तिगत / एकल विक्रेता')}</option>
+          <option value="PROPRIETORSHIP">{t('Proprietorship', 'प्रोप्राइटरशिप')}</option>
+          <option value="PARTNERSHIP">{t('Partnership firm', 'पार्टनरशिप फर्म')}</option>
+          <option value="PRIVATE_LIMITED">{t('Private Limited', 'प्राइवेट लिमिटेड')}</option>
+          <option value="LLP">{t('LLP', 'एलएलपी')}</option>
         </select>
       </Field>
 
-      <Field label="Legal / registered name" required>
-        <input className="input-field" required minLength={2} placeholder="Name as on PAN"
+      <Field label={t('Legal / registered name', 'कानूनी / पंजीकृत नाम')} required>
+        <input className="input-field" required minLength={2} placeholder={t('Name as on PAN', 'पैन पर दर्ज नाम')}
           value={f.legalName} onChange={(e) => setF({ ...f, legalName: e.target.value })} />
       </Field>
 
       <Field
-        label={vendor?.panNumber ? `PAN (on file: ${vendor.panNumber})` : 'PAN'}
+        label={vendor?.panNumber ? `${t('PAN (on file:', 'पैन (दर्ज:')} ${vendor.panNumber})` : t('PAN', 'पैन')}
         required={!vendor?.panNumber}
-        hint="10 characters, format ABCDE1234F"
+        hint={t('10 characters, format ABCDE1234F', '10 अक्षर, प्रारूप ABCDE1234F')}
       >
         <input className="input-field uppercase" placeholder="ABCDE1234F" maxLength={10}
           pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
@@ -222,20 +235,21 @@ function StepBusiness({ vendor, onDone }: { vendor: any; onDone: () => void }) {
           value={f.panNumber} onChange={(e) => setF({ ...f, panNumber: e.target.value.toUpperCase() })} />
       </Field>
 
-      <Field label={`GSTIN${gstRequired ? '' : ' (optional)'}`} required={gstRequired}
-        hint={gstRequired ? 'Required for registered businesses' : 'Individuals under the GST threshold may skip'}>
+      <Field label={`${t('GSTIN', 'जीएसटीआईएन')}${gstRequired ? '' : ` ${t('(optional)', '(वैकल्पिक)')}`}`} required={gstRequired}
+        hint={gstRequired ? t('Required for registered businesses', 'पंजीकृत व्यवसायों के लिए आवश्यक') : t('Individuals under the GST threshold may skip', 'जीएसटी सीमा से कम वाले व्यक्ति इसे छोड़ सकते हैं')}>
         <input className="input-field uppercase" placeholder="22ABCDE1234F1Z5" maxLength={15}
           required={gstRequired}
           value={f.gstin} onChange={(e) => setF({ ...f, gstin: e.target.value.toUpperCase() })} />
       </Field>
 
-      <button disabled={busy} className="btn-primary">{busy ? 'Saving…' : 'Save & continue'}</button>
+      <button disabled={busy} className="btn-primary">{busy ? t('Saving…', 'सहेज रहे हैं…') : t('Save & continue', 'सहेजें और आगे बढ़ें')}</button>
     </form>
   );
 }
 
 // ── STEP 3 ───────────────────────────────────────────────────────────────────
 function StepBank({ vendor, onDone }: { vendor: any; onDone: () => void }) {
+  const { t } = useLang();
   const [f, setF] = useState({
     bankAccountName: vendor?.bankAccountName ?? '',
     bankAccountNumber: '',
@@ -247,41 +261,42 @@ function StepBank({ vendor, onDone }: { vendor: any; onDone: () => void }) {
     setBusy(true);
     try {
       await api('/api/vendors/onboard/step/3', { method: 'PATCH', body: JSON.stringify(f) });
-      toast.success('Bank details saved');
+      toast.success(t('Bank details saved', 'बैंक विवरण सहेजा गया'));
       onDone();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
   return (
     <form onSubmit={save} className="space-y-5">
-      <h2 className="font-display text-2xl text-ink-900">Bank account for payouts</h2>
-      <p className="text-sm text-ink-700 -mt-2">Payouts run weekly to this account. Account number is stored encrypted.</p>
+      <h2 className="font-display text-2xl text-ink-900">{t('Bank account for payouts', 'भुगतान के लिए बैंक खाता')}</h2>
+      <p className="text-sm text-ink-700 -mt-2">{t('Payouts run weekly to this account. Account number is stored encrypted.', 'भुगतान हर हफ़्ते इसी खाते में होता है। खाता संख्या एन्क्रिप्टेड रूप में सुरक्षित रहती है।')}</p>
 
-      <Field label="Account holder name" required>
+      <Field label={t('Account holder name', 'खाताधारक का नाम')} required>
         <input className="input-field" required minLength={2}
           value={f.bankAccountName} onChange={(e) => setF({ ...f, bankAccountName: e.target.value })} />
       </Field>
       <Field
-        label={vendor?.bankAccountNumber ? `Account number (on file: ${vendor.bankAccountNumber})` : 'Account number'}
+        label={vendor?.bankAccountNumber ? `${t('Account number (on file:', 'खाता संख्या (दर्ज:')} ${vendor.bankAccountNumber})` : t('Account number', 'खाता संख्या')}
         required={!vendor?.bankAccountNumber}
       >
         <input className="input-field" inputMode="numeric" pattern="[0-9]{9,18}"
-          placeholder="9–18 digit account number"
+          placeholder={t('9–18 digit account number', '9–18 अंकों की खाता संख्या')}
           required={!vendor?.bankAccountNumber}
           value={f.bankAccountNumber} onChange={(e) => setF({ ...f, bankAccountNumber: e.target.value.replace(/\D/g, '') })} />
       </Field>
-      <Field label="IFSC code" required hint="11 characters, format ABCD0123456">
+      <Field label={t('IFSC code', 'आईएफएससी कोड')} required hint={t('11 characters, format ABCD0123456', '11 अक्षर, प्रारूप ABCD0123456')}>
         <input className="input-field uppercase" required maxLength={11} pattern="[A-Za-z]{4}0[A-Za-z0-9]{6}"
           placeholder="HDFC0001234"
           value={f.bankIfsc} onChange={(e) => setF({ ...f, bankIfsc: e.target.value.toUpperCase() })} />
       </Field>
-      <button disabled={busy} className="btn-primary">{busy ? 'Saving…' : 'Save & continue'}</button>
+      <button disabled={busy} className="btn-primary">{busy ? t('Saving…', 'सहेज रहे हैं…') : t('Save & continue', 'सहेजें और आगे बढ़ें')}</button>
     </form>
   );
 }
 
 // ── STEP 4 ───────────────────────────────────────────────────────────────────
 function StepAddress({ vendor, onDone }: { vendor: any; onDone: () => void }) {
+  const { t } = useLang();
   const a = vendor?.pickupAddress;
   const [f, setF] = useState({
     contactName: a?.contactName ?? '',
@@ -299,56 +314,57 @@ function StepAddress({ vendor, onDone }: { vendor: any; onDone: () => void }) {
     setBusy(true);
     try {
       await api('/api/vendors/onboard/step/4', { method: 'PATCH', body: JSON.stringify(f) });
-      toast.success('Pickup address saved');
+      toast.success(t('Pickup address saved', 'पिकअप पता सहेजा गया'));
       onDone();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
   }
   return (
     <form onSubmit={save} className="space-y-5">
-      <h2 className="font-display text-2xl text-ink-900">Pickup address</h2>
-      <p className="text-sm text-ink-700 -mt-2">Where couriers will collect orders. Also used for returns.</p>
+      <h2 className="font-display text-2xl text-ink-900">{t('Pickup address', 'पिकअप पता')}</h2>
+      <p className="text-sm text-ink-700 -mt-2">{t('Where couriers will collect orders. Also used for returns.', 'जहाँ से कूरियर ऑर्डर लेगा। वापसी के लिए भी यही पता इस्तेमाल होगा।')}</p>
 
       <div className="grid sm:grid-cols-2 gap-4">
-        <Field label="Contact name" required>
+        <Field label={t('Contact name', 'संपर्क नाम')} required>
           <input className="input-field" required value={f.contactName}
             onChange={(e) => setF({ ...f, contactName: e.target.value })} />
         </Field>
-        <Field label="Phone" required>
+        <Field label={t('Phone', 'फ़ोन')} required>
           <input className="input-field" required inputMode="numeric" value={f.phone}
             onChange={(e) => setF({ ...f, phone: e.target.value })} />
         </Field>
       </div>
-      <Field label="Address line 1" required>
+      <Field label={t('Address line 1', 'पता पंक्ति 1')} required>
         <input className="input-field" required value={f.line1}
           onChange={(e) => setF({ ...f, line1: e.target.value })} />
       </Field>
-      <Field label="Address line 2">
+      <Field label={t('Address line 2', 'पता पंक्ति 2')}>
         <input className="input-field" value={f.line2}
           onChange={(e) => setF({ ...f, line2: e.target.value })} />
       </Field>
       <div className="grid sm:grid-cols-3 gap-4">
-        <Field label="City" required>
+        <Field label={t('City', 'शहर')} required>
           <input className="input-field" required value={f.city}
             onChange={(e) => setF({ ...f, city: e.target.value })} />
         </Field>
-        <Field label="State" required>
+        <Field label={t('State', 'राज्य')} required>
           <input className="input-field" required value={f.state}
             onChange={(e) => setF({ ...f, state: e.target.value })} />
         </Field>
-        <Field label="PIN code" required>
+        <Field label={t('PIN code', 'पिन कोड')} required>
           <input className="input-field" required inputMode="numeric" pattern="[0-9]{6}" maxLength={6}
             value={f.postalCode}
             onChange={(e) => setF({ ...f, postalCode: e.target.value.replace(/\D/g, '') })} />
         </Field>
       </div>
-      <button disabled={busy} className="btn-primary">{busy ? 'Saving…' : 'Save & continue'}</button>
+      <button disabled={busy} className="btn-primary">{busy ? t('Saving…', 'सहेज रहे हैं…') : t('Save & continue', 'सहेजें और आगे बढ़ें')}</button>
     </form>
   );
 }
 
 // ── STEP 5 ───────────────────────────────────────────────────────────────────
 function StepBranding({ vendor, onDone }: { vendor: any; onDone: () => void }) {
+  const { t } = useLang();
   const [themeColor, setThemeColor] = useState(vendor?.themeColor ?? '#F1641E');
   const [logo, setLogo] = useState<File | null>(null);
   const [banner, setBanner] = useState<File | null>(null);
@@ -363,7 +379,7 @@ function StepBranding({ vendor, onDone }: { vendor: any; onDone: () => void }) {
       if (logo) fd.append('logo', logo);
       if (banner) fd.append('banner', banner);
       await api('/api/vendors/onboard/step/5', { method: 'PATCH', body: fd as any, headers: {} as any });
-      toast.success('Branding saved');
+      toast.success(t('Branding saved', 'ब्रांडिंग सहेजी गई'));
       onDone();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
@@ -371,54 +387,55 @@ function StepBranding({ vendor, onDone }: { vendor: any; onDone: () => void }) {
 
   return (
     <form onSubmit={save} className="space-y-5">
-      <h2 className="font-display text-2xl text-ink-900">Brand your shop</h2>
-      <p className="text-sm text-ink-700 -mt-2">Optional now — you can refine this later under Settings.</p>
+      <h2 className="font-display text-2xl text-ink-900">{t('Brand your shop', 'अपनी दुकान को सजाएँ')}</h2>
+      <p className="text-sm text-ink-700 -mt-2">{t('Optional now — you can refine this later under Settings.', 'अभी वैकल्पिक — आप इसे बाद में सेटिंग्स में बदल सकते हैं।')}</p>
 
-      <Field label="Logo">
+      <Field label={t('Logo', 'लोगो')}>
         <div className="flex items-center gap-4">
-          {vendor?.shopLogoUrl && <img src={vendor.shopLogoUrl} alt="" className="h-16 w-16 rounded-md object-cover border border-line" />}
+          {vendor?.shopLogoUrl && <img src={vendor.shopLogoUrl} alt={t('Shop logo', 'दुकान का लोगो')} className="h-16 w-16 rounded-md object-cover border border-line" />}
           <input type="file" accept="image/*" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
         </div>
       </Field>
-      <Field label="Banner" hint="Wide image shown on your storefront (up to 5 total — adds to gallery)">
+      <Field label={t('Banner', 'बैनर')} hint={t('Wide image shown on your storefront (up to 5 total — adds to gallery)', 'आपकी दुकान पर दिखने वाली चौड़ी छवि (अधिकतम 5 — गैलरी में जुड़ती है)')}>
         <input type="file" accept="image/*" onChange={(e) => setBanner(e.target.files?.[0] ?? null)} />
       </Field>
-      <Field label="Theme color">
+      <Field label={t('Theme color', 'थीम रंग')}>
         <div className="flex items-center gap-3">
           <input type="color" value={themeColor} onChange={(e) => setThemeColor(e.target.value)}
             className="h-10 w-16 rounded border border-line" />
           <span className="text-sm text-ink-700 font-mono">{themeColor}</span>
         </div>
       </Field>
-      <button disabled={busy} className="btn-primary">{busy ? 'Uploading…' : 'Save & continue'}</button>
+      <button disabled={busy} className="btn-primary">{busy ? t('Uploading…', 'अपलोड हो रहा है…') : t('Save & continue', 'सहेजें और आगे बढ़ें')}</button>
     </form>
   );
 }
 
 // ── STEP 6 ───────────────────────────────────────────────────────────────────
 function StepIdAndSubmit({ vendor, stepsDone, onDone }: { vendor: any; stepsDone: Record<string, boolean>; onDone: () => void }) {
+  const { t } = useLang();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
 
   const blockers = useMemo(() => {
     const m: string[] = [];
-    if (!stepsDone['1']) m.push('Shop details');
-    if (!stepsDone['2']) m.push('Business details (PAN)');
-    if (!stepsDone['3']) m.push('Bank account');
-    if (!stepsDone['4']) m.push('Pickup address');
+    if (!stepsDone['1']) m.push(t('Shop details', 'दुकान विवरण'));
+    if (!stepsDone['2']) m.push(t('Business details (PAN)', 'व्यापार विवरण (पैन)'));
+    if (!stepsDone['3']) m.push(t('Bank account', 'बैंक खाता'));
+    if (!stepsDone['4']) m.push(t('Pickup address', 'पिकअप पता'));
     return m;
-  }, [stepsDone]);
+  }, [stepsDone, t]);
 
   async function uploadId(e: React.FormEvent) {
     e.preventDefault();
-    if (!file) return toast.error('Please choose a file');
+    if (!file) return toast.error(t('Please choose a file', 'कृपया एक फ़ाइल चुनें'));
     setBusy(true);
     try {
       const fd = new FormData();
       fd.append('idDocument', file);
       await api('/api/vendors/onboard/step/6', { method: 'PATCH', body: fd as any, headers: {} as any });
-      toast.success('ID uploaded');
+      toast.success(t('ID uploaded', 'पहचान दस्तावेज़ अपलोड हुआ'));
       onDone();
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
@@ -428,7 +445,7 @@ function StepIdAndSubmit({ vendor, stepsDone, onDone }: { vendor: any; stepsDone
     setBusy(true);
     try {
       await api('/api/vendors/onboard/submit', { method: 'POST', body: JSON.stringify({}) });
-      toast.success('Submitted for review!');
+      toast.success(t('Submitted for review!', 'समीक्षा के लिए भेज दिया गया!'));
       router.push('/sell/onboard/review');
     } catch (e: any) { toast.error(e.message); }
     finally { setBusy(false); }
@@ -436,35 +453,35 @@ function StepIdAndSubmit({ vendor, stepsDone, onDone }: { vendor: any; stepsDone
 
   return (
     <div className="space-y-5">
-      <h2 className="font-display text-2xl text-ink-900">Verify your identity</h2>
+      <h2 className="font-display text-2xl text-ink-900">{t('Verify your identity', 'अपनी पहचान सत्यापित करें')}</h2>
       <p className="text-sm text-ink-700 -mt-2">
-        Upload a clear photo of your PAN card or Aadhaar. Our team reviews KYC within 24–48 hours.
+        {t('Upload a clear photo of your PAN card or Aadhaar. Our team reviews KYC within 24–48 hours.', 'अपने पैन कार्ड या आधार की साफ़ फ़ोटो अपलोड करें। हमारी टीम 24–48 घंटों में केवाईसी की समीक्षा करती है।')}
       </p>
 
       <form onSubmit={uploadId} className="space-y-4">
-        <Field label="ID document" required hint="JPG, PNG, or PDF — up to 10 MB">
+        <Field label={t('ID document', 'पहचान दस्तावेज़')} required hint={t('JPG, PNG, or PDF — up to 10 MB', 'JPG, PNG या PDF — अधिकतम 10 MB')}>
           <input type="file" accept="image/*,application/pdf"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           {vendor?.idDocumentUrl && (
-            <p className="text-xs text-success mt-1.5">✓ Document on file. Upload again to replace.</p>
+            <p className="text-xs text-success mt-1.5">{t('✓ Document on file. Upload again to replace.', '✓ दस्तावेज़ दर्ज है। बदलने के लिए फिर से अपलोड करें।')}</p>
           )}
         </Field>
-        <button disabled={busy || !file} className="btn-secondary">{busy ? 'Uploading…' : 'Upload document'}</button>
+        <button disabled={busy || !file} className="btn-secondary">{busy ? t('Uploading…', 'अपलोड हो रहा है…') : t('Upload document', 'दस्तावेज़ अपलोड करें')}</button>
       </form>
 
       <div className="border-t border-line pt-5">
         {blockers.length > 0 ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-4">
-            <p className="font-semibold text-sm text-ink-900">Complete these first:</p>
+            <p className="font-semibold text-sm text-ink-900">{t('Complete these first:', 'पहले इन्हें पूरा करें:')}</p>
             <ul className="text-sm text-ink-700 mt-1.5 list-disc pl-5">
               {blockers.map((b) => <li key={b}>{b}</li>)}
             </ul>
           </div>
         ) : !vendor?.idDocumentUrl ? (
-          <p className="text-sm text-ink-700">Upload your ID document to submit for review.</p>
+          <p className="text-sm text-ink-700">{t('Upload your ID document to submit for review.', 'समीक्षा के लिए भेजने हेतु अपना पहचान दस्तावेज़ अपलोड करें।')}</p>
         ) : (
           <button onClick={submit} disabled={busy} className="btn-primary !py-3 !px-6">
-            {busy ? 'Submitting…' : 'Submit for review'}
+            {busy ? t('Submitting…', 'भेजा जा रहा है…') : t('Submit for review', 'समीक्षा के लिए भेजें')}
           </button>
         )}
       </div>

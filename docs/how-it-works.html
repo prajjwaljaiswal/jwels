@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vrindaonline — How it works</title>
+<meta name="description" content="Vrindaonline brings independent jewellery brands together — each with its own branded shop. Here's the journey, for shoppers and for sellers.">
+<style>
+  :root {
+    --ground:  #fbf6f0;
+    --surface: #ffffff;
+    --text:    #2a2024;
+    --muted:   #6f635b;
+    --line:    #ece1d5;
+    --coral:   #e65a1a;
+    --gold:    #a87c3d;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--text); font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 22px; }
+  html:lang(hi) body { font-family: var(--sans); }
+  html:lang(hi) h1, html:lang(hi) h2, html:lang(hi) h3, html:lang(hi) .wm { font-family: "Tiro Devanagari Hindi", "Noto Serif Devanagari", var(--serif); }
+
+  /* ── Top bar: logo + language switch ────────────────── */
+  .topbar { position: sticky; top: 0; z-index: 20; background: rgba(251,246,240,.88); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 12px; padding-bottom: 12px; }
+  .brand { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; }
+  .brand svg { width: 28px; height: 28px; display: block; }
+  .brand .wm { font-family: var(--serif); font-size: 22px; font-weight: 600; color: var(--coral); letter-spacing: -.01em; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .lang button { font-family: var(--sans); font-size: 13px; font-weight: 600; border: 0; background: transparent; color: var(--muted); padding: 6px 14px; cursor: pointer; line-height: 1.4; }
+  .lang button.on { background: var(--coral); color: #fff; }
+  .lang button:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+
+  .eyebrow { font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--coral); font-weight: 600; }
+
+  .hero { padding: 60px 0 52px; text-align: center; }
+  .hero .eyebrow { margin-bottom: 22px; }
+  .hero h1 { font-family: var(--serif); font-size: clamp(34px, 6.5vw, 56px); line-height: 1.06; font-weight: 600; letter-spacing: -.01em; margin: 0 auto 22px; max-width: 16ch; }
+  .hero h1 em { font-style: italic; color: var(--coral); }
+  .hero p { font-size: clamp(16px, 2.4vw, 19px); color: var(--muted); max-width: 52ch; margin: 0 auto 30px; }
+  .jump { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .jump a { font-family: var(--sans); font-size: 14px; font-weight: 600; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 9px 20px; transition: transform .15s ease, border-color .15s ease; }
+  .jump a .dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+  .jump a.shop .dot { background: var(--coral); }
+  .jump a.sell .dot { background: var(--gold); }
+  .jump a:hover { transform: translateY(-2px); border-color: var(--muted); }
+
+  .track { padding: 30px 0 14px; scroll-margin-top: 64px; }
+  .track-head { margin-bottom: 30px; }
+  .track-head .eyebrow.gold { color: var(--gold); }
+  .track-head h2 { font-family: var(--serif); font-weight: 600; letter-spacing: -.01em; font-size: clamp(26px, 4.5vw, 34px); margin: 8px 0 6px; }
+  .track-head p { color: var(--muted); margin: 0; max-width: 50ch; font-size: 15.5px; }
+
+  .thread { position: relative; }
+  .thread::before { content: ""; position: absolute; left: 21px; top: 26px; bottom: 26px; width: 2px; background: var(--tc, var(--coral)); opacity: .28; }
+  .track.sellers .thread { --tc: var(--gold); }
+
+  .bead-step { position: relative; display: grid; grid-template-columns: 44px 1fr; gap: 18px; align-items: start; padding: 13px 0; }
+  .bead { position: relative; z-index: 1; width: 44px; height: 44px; border-radius: 999px; background: radial-gradient(circle at 33% 30%, rgba(255,255,255,.55), rgba(255,255,255,0) 45%), var(--tc, var(--coral)); color: #fff; font-family: var(--serif); font-size: 18px; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(42,32,36,.14), inset 0 0 0 1px rgba(255,255,255,.25); }
+  .track.sellers .bead { --tc: var(--gold); }
+
+  .bead-body { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 15px 18px; transition: transform .15s ease, box-shadow .15s ease; }
+  .bead-body:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(42,32,36,.07); }
+  .bead-body h3 { font-family: var(--serif); font-size: 19px; font-weight: 600; margin: 0 0 4px; }
+  .bead-body p { margin: 0; color: var(--muted); font-size: 14.5px; }
+  .bead-body .hl { color: var(--text); font-weight: 600; }
+  .bead-body code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; background: var(--ground); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--text); }
+
+  .meet { margin: 56px 0; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 40px 28px; }
+  .meet .knot { font-size: 26px; margin-bottom: 8px; color: var(--gold); }
+  .meet h2 { font-family: var(--serif); font-weight: 600; font-size: clamp(22px,4vw,30px); margin: 0 0 10px; }
+  .meet p { color: var(--muted); max-width: 46ch; margin: 0 auto; font-size: 16px; }
+  .meet .amp { display: inline-block; margin: 0 5px; font-family: var(--serif); font-style: italic; color: var(--coral); }
+
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 10px 0 56px; }
+  footer .marque { font-family: var(--serif); color: var(--text); font-size: 15px; }
+
+  a:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hero > * { animation: rise .7s ease both; }
+    .hero p { animation-delay: .08s; }
+    .hero .jump { animation-delay: .16s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap bar-inner">
+      <a class="brand" href="#top" aria-label="Vrindaonline">
+        <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <polygon points="11,4 16,4 16,12 3,12" fill="#FF7A3C"/>
+          <polygon points="16,4 21,4 29,12 16,12" fill="#F1641E"/>
+          <polygon points="3,12 16,12 16,29" fill="#F1641E"/>
+          <polygon points="16,12 29,12 16,29" fill="#D5530F"/>
+          <path d="M16 4 V12 M16 12 V29 M3 12 H29" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="0.6"/>
+          <path d="M11 4 H21 L29 12 L16 29 L3 12 Z" stroke="#A33F08" stroke-opacity="0.35" stroke-width="0.75" stroke-linejoin="round"/>
+        </svg>
+        <span class="wm">Vrindaonline</span>
+      </a>
+      <div class="lang" role="group" aria-label="Language / भाषा">
+        <button type="button" data-lang="en">EN</button>
+        <button type="button" data-lang="hi">हिं</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" id="top">
+
+    <section class="hero">
+      <div class="eyebrow" data-hi="Vrindaonline · ऑनलाइन ज्वेलरी मार्केटप्लेस">Vrindaonline · online jewellery marketplace</div>
+      <h1 data-hi='हर ज्वेलर का, <em>अपना एक स्टोर</em>।'>Every jeweller, a <em>shop of their own</em>.</h1>
+      <p data-hi="Vrindaonline स्वतंत्र ज्वेलरी ब्रांड्स को एक ही जगह लाता है — और हर एक को उनका अपना सुंदर, ब्रांडेड स्टोर देता है। यह कैसे काम करता है, यहाँ जानिए — खरीदने वालों के लिए और बेचने वालों के लिए।">Vrindaonline brings independent jewellery brands together in one place — and gives each of them a beautiful, branded store. Here's how it works, for the people who shop and the people who sell.</p>
+      <div class="jump">
+        <a class="shop" href="#shoppers"><span class="dot"></span><span data-hi="अगर आप खरीदने आए हैं">If you're here to shop</span></a>
+        <a class="sell" href="#sellers"><span class="dot"></span><span data-hi="अगर आप बेचने आए हैं">If you're here to sell</span></a>
+      </div>
+    </section>
+
+    <!-- SHOPPERS -->
+    <section class="track shoppers" id="shoppers">
+      <div class="track-head">
+        <div class="eyebrow" data-hi="खरीदारों के लिए">For shoppers</div>
+        <h2 data-hi="ब्राउज़िंग से लेकर आपके दरवाज़े तक">From browsing to your doorstep</h2>
+        <p data-hi="कई स्वतंत्र ज्वेलर्स के डिज़ाइन खोजें — और खरीदारी के लिए एक ही भरोसेमंद जगह पर रहें।">Discover pieces from many independent jewellers — without ever leaving one trusted place to buy.</p>
+      </div>
+      <div class="thread">
+        <div class="bead-step"><div class="bead">1</div><div class="bead-body">
+          <h3 data-hi="खोजें">Discover</h3>
+          <p data-hi="रिंग, नेकलेस, इयररिंग और बहुत कुछ — दर्जनों स्वतंत्र ज्वेलर्स से, सब एक ही मार्केटप्लेस में।">Browse rings, necklaces, earrings and more from dozens of independent jewellers — all gathered in one marketplace.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">2</div><div class="bead-body">
+          <h3 data-hi="किसी स्टोर में जाएँ">Step inside a shop</h3>
+          <p data-hi='हर सेलर का <span class="hl">अपना ब्रांडेड स्टोर</span> होता है — उनका नाम, उनके रंग, उनकी कहानी। ऐसा लगता है जैसे आप उनकी बुटीक में आए हों, किसी आम लिस्टिंग में नहीं।'>Every seller has their <span class="hl">own branded store</span> — their name, their colours, their story. It feels like visiting their boutique, not a generic listing.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">3</div><div class="bead-body">
+          <h3 data-hi="अपना बैग भरें">Fill your bag</h3>
+          <p data-hi="जो पसंद आए उसे जोड़ें। आप एक बार में एक ही बुटीक से खरीदते हैं, इसलिए बैग और चेकआउट आसान और साफ़ रहता है।">Add the pieces you love. You shop one boutique at a time, so your bag and checkout stay simple and clear.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">4</div><div class="bead-body">
+          <h3 data-hi="बेफ़िक्र होकर भुगतान करें">Pay with confidence</h3>
+          <p data-hi="सुरक्षित रूप से चेकआउट करें। आपकी पेमेंट और निजी जानकारी पूरे समय सुरक्षित रहती है।">Check out securely. Your payment and personal details are protected the whole way through.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">5</div><div class="bead-body">
+          <h3 data-hi="ऑर्डर को घर तक ट्रैक करें">Track it home</h3>
+          <p data-hi="अपने ऑर्डर को वर्कशॉप से लेकर अपने दरवाज़े तक ट्रैक करें, हर कदम पर अपडेट के साथ।">Follow your order from the workshop to your door, with updates at every step.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- SELLERS -->
+    <section class="track sellers" id="sellers">
+      <div class="track-head">
+        <div class="eyebrow gold" data-hi="विक्रेताओं के लिए">For sellers</div>
+        <h2 data-hi="आवेदन से लेकर अपने स्टोरफ्रंट तक">From application to your own storefront</h2>
+        <p data-hi="कुछ ही दिनों में एक प्रोफेशनल ज्वेलरी स्टोर खोलें — कोई डेवलपर नहीं, कोई कोड नहीं, और एक वेब एड्रेस जो सच में आपका अपना हो।">Open a professional jewellery store in days — no developer, no code, and a web address that's truly yours.</p>
+      </div>
+      <div class="thread">
+        <div class="bead-step"><div class="bead">1</div><div class="bead-body">
+          <h3 data-hi="आवेदन करें">Apply</h3>
+          <p data-hi="हमें अपने ब्रांड और अपनी बनाई ज्वेलरी के बारे में बताएं। अकाउंट बनाने में बस कुछ मिनट लगते हैं।">Tell us about your brand and the jewellery you make. Setting up an account takes minutes.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">2</div><div class="bead-body">
+          <h3 data-hi="वेरिफ़ाई हों">Get verified</h3>
+          <p data-hi="एक बार की त्वरित जाँच मार्केटप्लेस को भरोसेमंद बनाए रखती है — ताकि खरीदार आपसे खरीदते हुए सुरक्षित महसूस करें।">A quick, one-time verification keeps the marketplace trustworthy — so buyers feel safe purchasing from you.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">3</div><div class="bead-body">
+          <h3 data-hi="अपना स्टोर डिज़ाइन करें">Design your shop</h3>
+          <p data-hi='एक थीम चुनें, अपना लोगो, प्रोडक्ट्स और कहानी जोड़ें। <span class="hl">कोई कोड नहीं, कोई डेवलपर नहीं</span> — बस क्लिक करें और पब्लिश कर दें।'>Choose a theme, add your logo, your products and your story. <span class="hl">No code, no developer</span> — just point, click and publish.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">4</div><div class="bead-body">
+          <h3 data-hi="अपना वेब एड्रेस लें">Claim your address</h3>
+          <p data-hi='तुरंत एक तैयार वेब एड्रेस पाएं, जैसे <code>yourshop.store.vrindaonline.com</code> — या अपना खुद का डोमेन जोड़ें, जैसे <code>yourbrand.com</code>। दोनों ही हालात में सुरक्षा का ताला (SSL) अपने आप लग जाता है।'>Get a ready-made web address like <code>yourshop.store.vrindaonline.com</code> instantly — or connect a domain you already own, like <code>yourbrand.com</code>. Either way, the secure padlock is set up for you.</p>
+        </div></div>
+        <div class="bead-step"><div class="bead">5</div><div class="bead-body">
+          <h3 data-hi="बेचें और भुगतान पाएं">Sell &amp; get paid</h3>
+          <p data-hi="हर ऑर्डर को एक ही आसान डैशबोर्ड से संभालें। जैसे-जैसे बिक्री होती है, आपकी कमाई आपके अकाउंट में आती जाती है।">Manage every order from one simple dashboard. As sales come in, your earnings are settled to your account.</p>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- CLOSING -->
+    <section class="meet">
+      <div class="knot">◇</div>
+      <h2 data-hi="दो पहलू, एक मार्केटप्लेस">Two sides, one marketplace</h2>
+      <p data-hi='विक्रेताओं को अपने खुद के स्टोर की पूरी आज़ादी मिलती है<span class="amp">और</span>खरीदारों को एक ही जगह खोजने और खरीदने का भरोसा। यही है Vrindaonline।'>Sellers get the freedom of a store that's truly their own<span class="amp">&amp;</span>shoppers get the trust of one place to discover and buy. That's Vrindaonline.</p>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="marque">Vrindaonline</div>
+    <span data-hi="स्वतंत्र ज्वेलर्स के लिए एक ऑनलाइन मार्केटप्लेस">an online marketplace for independent jewellers</span>
+  </footer>
+
+  <script>
+    (function () {
+      var els = Array.prototype.slice.call(document.querySelectorAll('[data-hi]'));
+      // Capture the authored English so we can swap back without duplicating it in markup.
+      els.forEach(function (el) { el.setAttribute('data-en', el.innerHTML); });
+      var btns = Array.prototype.slice.call(document.querySelectorAll('.lang button'));
+      function apply(lang) {
+        lang = (lang === 'hi') ? 'hi' : 'en';
+        els.forEach(function (el) { el.innerHTML = el.getAttribute('data-' + lang); });
+        document.documentElement.lang = lang;
+        btns.forEach(function (b) {
+          var on = b.getAttribute('data-lang') === lang;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        try { localStorage.setItem('vol-lang', lang); } catch (e) {}
+      }
+      btns.forEach(function (b) {
+        b.addEventListener('click', function () { apply(b.getAttribute('data-lang')); });
+      });
+      var saved = null;
+      try { saved = localStorage.getItem('vol-lang'); } catch (e) {}
+      apply(saved || 'en');
+    })();
+  </script>
+</body>
+</html>

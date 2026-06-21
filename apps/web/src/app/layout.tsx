@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
 import { CartHydrator } from '@/components/CartHydrator';
 import { Analytics } from '@/components/Analytics';
+import { LanguageProvider } from '@/lib/i18n';
 
 export const metadata: Metadata = {
   title: 'Vrindaonline — Handcrafted jewelry marketplace',
@@ -15,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-canvas text-ink-900 antialiased">
         <Analytics />
         <CartHydrator />
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
         <Toaster
           position="top-center"
           toastOptions={{

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-tenant Storefront — Architecture</title>
+<style>
+  :root {
+    --ground:   #131820;
+    --panel:    #1a212c;
+    --panel-2:  #202938;
+    --line:     #2c3744;
+    --text:     #e7ecf2;
+    --muted:    #93a0b1;
+    --accent:   #f1641e;  /* marketplace brand — the request hot path */
+    --accent-2: #5bc8c0;  /* control plane / data edges */
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 560px at 80% -10%, #1d2735 0, transparent 62%),
+      var(--ground);
+    background-color: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 48px 24px 72px; }
+
+  /* ── Header ─────────────────────────────────────────── */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 18px;
+  }
+  h1 {
+    font-size: clamp(26px, 4.4vw, 40px);
+    line-height: 1.08; font-weight: 700; letter-spacing: -.02em;
+    margin: 0 0 14px;
+  }
+  .lede { max-width: 60ch; color: var(--muted); font-size: 15px; margin: 0 0 22px; }
+  .lede code {
+    font-family: var(--mono); font-size: 12.5px;
+    color: var(--text); background: var(--panel-2);
+    padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line);
+  }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; padding: 0; margin: 0 0 6px; }
+  .legend li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .sw { width: 22px; height: 0; border-top: 2px solid var(--ln, var(--muted)); }
+  .sw.hot { --ln: var(--accent); }
+  .sw.ctl { --ln: var(--accent-2); border-top-style: dashed; }
+  .chip-sw { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line); }
+  .chip-sw.fp { background: var(--panel-2); }
+  .chip-sw.ex { background: transparent; border-style: dashed; border-color: var(--muted); }
+
+  /* ── Flow ───────────────────────────────────────────── */
+  .flow { margin-top: 30px; display: flex; flex-direction: column; align-items: stretch; }
+
+  .tier {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 18px 18px 16px;
+  }
+  .tag {
+    position: absolute; top: -9px; left: 16px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--muted);
+    background: var(--ground); padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px;
+  }
+
+  /* connector between tiers */
+  .link { height: 40px; position: relative; display: flex; justify-content: center; }
+  .link::before {
+    content: ""; width: 2px; height: 100%;
+    background: linear-gradient(var(--accent) 55%, transparent 0);
+    background-size: 2px 11px;
+    animation: flow .7s linear infinite;
+  }
+  .link::after {
+    content: ""; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+    border-left: 5px solid transparent; border-right: 5px solid transparent;
+    border-top: 7px solid var(--accent);
+  }
+  .step {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 22px; height: 22px; border-radius: 999px;
+    background: var(--accent); color: #1a0f08;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 4px var(--ground);
+  }
+  @keyframes flow { to { background-position: 0 11px; } }
+
+  .row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .row > * { flex: 1 1 0; min-width: 150px; }
+
+  .node {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+    padding: 12px 13px;
+  }
+  .node.ext { background: transparent; border-style: dashed; }
+  .node h3 {
+    margin: 0 0 5px; font-family: var(--mono); font-size: 13px; font-weight: 600;
+    letter-spacing: -.01em; display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  }
+  .node p { margin: 0; font-size: 12px; color: var(--muted); }
+  .node code, .pill {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--accent-2);
+  }
+  .port {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; font-weight: 500;
+  }
+
+  .tier-title { font-family: var(--mono); font-size: 13px; margin: 0 0 4px; font-weight: 600; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .tier-sub { margin: 0 0 13px; font-size: 12px; color: var(--muted); }
+
+  /* storefront internal pipeline */
+  .pipe { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+  .stage {
+    flex: 1 1 0; min-width: 150px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+    padding: 11px 12px; position: relative;
+  }
+  .stage + .stage { margin-left: 26px; }
+  .stage + .stage::before {
+    content: ""; position: absolute; left: -22px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 2px; background: var(--accent);
+  }
+  .stage + .stage::after {
+    content: ""; position: absolute; left: -9px; top: 50%; transform: translateY(-50%);
+    border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid var(--accent);
+  }
+  .stage .k { font-family: var(--mono); font-size: 11px; color: var(--accent); display:block; margin-bottom:4px; }
+  .stage .t { font-family: var(--mono); font-size: 12.5px; font-weight: 600; display: block; margin-bottom: 4px; }
+  .stage .d { font-size: 11.5px; color: var(--muted); }
+
+  .endpoints { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .ep {
+    font-family: var(--mono); font-size: 11px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px;
+  }
+  .ep.hot { border-color: rgba(241,100,30,.5); color: #ffcdb0; }
+  .ep.ctl { border-color: rgba(91,200,192,.45); color: #bdeee9; }
+
+  /* control-plane asides */
+  .aside {
+    margin-top: 14px; border: 1px dashed rgba(91,200,192,.45); border-radius: 9px;
+    background: rgba(91,200,192,.05); padding: 12px 13px;
+  }
+  .aside h4 {
+    margin: 0 0 6px; font-family: var(--mono); font-size: 12px; color: var(--accent-2);
+    letter-spacing: .04em; display: flex; align-items: center; gap: 7px;
+  }
+  .aside p { margin: 0; font-size: 12px; color: var(--muted); }
+  .aside .seq { color: var(--text); font-family: var(--mono); font-size: 11.5px; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 620px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* ── Footer: numbered request trace ─────────────────── */
+  .trace { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 26px; }
+  .trace h2 { font-size: 13px; font-family: var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin: 0 0 16px; }
+  .steps { list-style: none; counter-reset: s; margin: 0; padding: 0; display: grid; gap: 9px; }
+  .steps li {
+    display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: baseline;
+    font-size: 13.5px; counter-increment: s;
+  }
+  .steps li::before {
+    content: counter(s); font-family: var(--mono); font-size: 11px; font-weight: 700;
+    color: #1a0f08; background: var(--accent); width: 22px; height: 22px; border-radius: 999px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps b { font-family: var(--mono); font-weight: 600; color: var(--text); }
+  .steps .api { color: var(--accent-2); font-family: var(--mono); }
+
+  .foot { margin-top: 34px; font-size: 11.5px; color: var(--muted); font-family: var(--mono); }
+
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .link::before { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">vrindaonline · multi-tenant storefront</div>
+    <h1>One Next.js app, every vendor its own storefront.</h1>
+    <p class="lede">
+      How a request to <code>jhumkaya.store.vrindaonline.com</code> — or a vendor's own
+      <code>brand.com</code> — becomes a server-rendered, on-brand store. Host-resolved at the
+      edge, themed on the server, no micro-frontends.
+    </p>
+    <ul class="legend">
+      <li><span class="sw hot"></span> Request hot path</li>
+      <li><span class="sw ctl"></span> Control plane (revalidate · verify)</li>
+      <li><span class="chip-sw fp"></span> First-party process</li>
+      <li><span class="chip-sw ex"></span> External / client</li>
+    </ul>
+  </header>
+
+  <div class="flow">
+
+    <!-- CLIENTS -->
+    <section class="tier">
+      <span class="tag">Client</span>
+      <div class="row">
+        <div class="node ext">
+          <h3>App domain</h3>
+          <p><code>store.vrindaonline.com/{slug}</code><br>path-based, shared cert</p>
+        </div>
+        <div class="node ext">
+          <h3>Vendor subdomain</h3>
+          <p><code>{slug}.store.vrindaonline.com</code><br>covered by the wildcard cert</p>
+        </div>
+        <div class="node ext">
+          <h3>Custom domain</h3>
+          <p><code>brand.com</code><br>only once <span class="pill">VERIFIED</span></p>
+        </div>
+      </div>
+    </section>
+
+    <div class="link"><span class="step">1</span></div>
+
+    <!-- EDGE -->
+    <section class="tier">
+      <span class="tag">Edge · TLS</span>
+      <p class="tier-title">Caddy <span class="port">:443</span></p>
+      <p class="tier-sub">Terminates TLS, then reverse-proxies to a <code>127.0.0.1</code> upstream.</p>
+      <div class="row">
+        <div class="node">
+          <h3>store.* &amp; *.store.*</h3>
+          <p>One <b style="color:var(--text)">wildcard</b> cert via DNS-01 — every subdomain, zero per-vendor setup.</p>
+        </div>
+        <div class="node">
+          <h3>:443 on-demand TLS</h3>
+          <p>Unknown custom domain → asks <span class="ep ctl">GET /api/vendors/domain-allowed</span>. Cert minted only for verified domains.</p>
+        </div>
+        <div class="node">
+          <h3>First-party hosts</h3>
+          <p>api · www · vendor · admin → their own named blocks &amp; ports.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="link"><span class="step">2</span></div>
+
+    <!-- RUNTIME -->
+    <section class="tier">
+      <span class="tag">Runtime · PM2</span>
+      <p class="tier-title">Storefront <span class="port">next start · :3003</span></p>
+      <p class="tier-sub">Next.js 14 App Router. A tenant request walks this pipeline left → right.</p>
+      <div class="pipe">
+        <div class="stage">
+          <span class="k">3 · middleware.ts</span>
+          <span class="t">Classify host</span>
+          <span class="d">app · subdomain · custom → resolve via the API → rewrite <code>/x</code> to <code>/{slug}/x</code>. Unknown → 404 page, API down → 503.</span>
+        </div>
+        <div class="stage">
+          <span class="k">5 · [vendorId] layout</span>
+          <span class="t">RSC · getBrand()</span>
+          <span class="d">Dynamic (reads host). <code>cache()</code>-deduped <code>/brand</code> fetch, tagged for revalidation.</span>
+        </div>
+        <div class="stage">
+          <span class="k">7 · ThemedShell</span>
+          <span class="t">Server-merge theme</span>
+          <span class="d">CSS vars + favicon + title in the first byte → no FOUC. Blocks hydrate client-side.</span>
+        </div>
+      </div>
+      <div class="row" style="margin-top:13px">
+        <div class="node ext"><h3>web <span class="port">:3000</span></h3><p>marketplace</p></div>
+        <div class="node ext"><h3>vendor <span class="port">:3001</span></h3><p>dashboard · Domains tab</p></div>
+        <div class="node ext"><h3>admin <span class="port">:3002</span></h3><p>console</p></div>
+        <div class="node ext"><h3>robots · sitemap</h3><p>host-aware, per tenant</p></div>
+      </div>
+    </section>
+
+    <div class="link"><span class="step">4·6</span></div>
+
+    <!-- API -->
+    <section class="tier">
+      <span class="tag">API · Express</span>
+      <p class="tier-title">Single API <span class="port">:4000</span> <span style="color:var(--muted);font-weight:400">· /api/vendors/*</span></p>
+      <p class="tier-sub">Hot-path lookups are registered <b style="color:var(--text)">before</b> the <code>/:vendorId</code> catch-all.</p>
+      <div class="endpoints">
+        <span class="ep hot">GET /resolve</span>
+        <span class="ep hot">GET /:id/brand</span>
+        <span class="ep ctl">GET /domain-allowed</span>
+        <span class="ep">GET /:id/sitemap-entries</span>
+        <span class="ep ctl">POST /me/subdomain</span>
+        <span class="ep ctl">POST /me/custom-domain</span>
+        <span class="ep ctl">POST /me/custom-domain/verify</span>
+      </div>
+
+      <div class="grid2">
+        <div class="aside">
+          <h4>↻ Revalidation loop</h4>
+          <p>Vendor edits theme or publishes a page → API bumps <span class="seq">themeVersion</span> &amp; calls
+          <span class="seq">notifyStorefrontRevalidate()</span> → <span class="ep ctl">POST /api/revalidate</span> on the
+          storefront → <span class="seq">revalidateTag</span> (by id <em>and</em> slug) drops the cached brand.</p>
+        </div>
+        <div class="aside">
+          <h4>✓ Domain verification</h4>
+          <p>Add domain → API issues a token. Vendor sets <span class="seq">TXT</span> + <span class="seq">CNAME/A</span>,
+          then Verify → API checks DNS ownership + routing → status <span class="seq">VERIFIED</span> → Caddy will now
+          mint the cert.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="link"><span class="step">·</span></div>
+
+    <!-- DATA -->
+    <section class="tier">
+      <span class="tag">Data · Postgres</span>
+      <p class="tier-title">Prisma · <code>Vendor</code></p>
+      <p class="tier-sub">One integer doubles as cache key and invalidation signal.</p>
+      <div class="endpoints">
+        <span class="ep">subdomain <span style="color:var(--muted)">@unique</span></span>
+        <span class="ep">customDomain <span style="color:var(--muted)">@unique</span></span>
+        <span class="ep">customDomainStatus <span style="color:var(--muted)">: DomainStatus</span></span>
+        <span class="ep">customDomainToken</span>
+        <span class="ep">customDomainVerifiedAt</span>
+        <span class="ep">themeVersion</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- TRACE -->
+  <div class="trace">
+    <h2>A subdomain request, end to end</h2>
+    <ol class="steps">
+      <li>Browser opens <b>jhumkaya.store.vrindaonline.com</b>.</li>
+      <li><b>Caddy :443</b> terminates TLS with the wildcard cert, proxies to <b>127.0.0.1:3003</b>.</li>
+      <li><b>middleware</b> reads the Host header → classifies it as subdomain <b>jhumkaya</b>.</li>
+      <li>middleware → <span class="api">GET /resolve?by=subdomain&amp;key=jhumkaya</span> → <span class="api">{ vendorId, slug }</span>.</li>
+      <li>middleware rewrites <b>/</b> → <b>/jhumkaya</b> into the existing route tree.</li>
+      <li>The RSC layout's <b>getBrand()</b> calls <span class="api">GET /jhumkaya/brand</span> (cached, tagged).</li>
+      <li>Theme is merged on the server → themed HTML ships in the first byte. <b>No flash.</b></li>
+    </ol>
+  </div>
+
+  <p class="foot">PM2-hosted · self-signed nothing — Caddy issues every cert · the same route tree serves path, subdomain, and custom-domain access.</p>
+</div>
+</body>
+</html>

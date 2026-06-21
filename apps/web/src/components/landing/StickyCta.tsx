@@ -34,7 +34,7 @@ export function StickyCta() {
           Open your shop <span className="text-[#FFC58A] font-semibold ml-1">free · pay only when you sell</span>
         </span>
         <Link
-          href="/register?role=vendor"
+          href="/sell/register"
           className="inline-flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 transition rounded-pill px-5 py-2.5 text-sm font-semibold"
         >
           Get started

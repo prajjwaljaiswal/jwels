@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useLang } from '@/lib/i18n';
+import { goToVendorDashboard } from '@/lib/vendor-handoff';
 
 type Onboarding = {
   vendor: any;
@@ -12,13 +14,14 @@ type Onboarding = {
   kycRejectionNote: string | null;
 };
 
-const NEXT_STEPS = [
-  'We review your KYC and documents within 24–48 hours.',
-  'Once verified, you can start listing products.',
-  'Payouts run weekly to your registered bank account.',
+const NEXT_STEPS: [string, string][] = [
+  ['We review your KYC and documents within 24–48 hours.', 'हम आपके KYC और दस्तावेज़ों की 24–48 घंटों में जाँच करते हैं।'],
+  ['Once verified, you can start listing products.', 'सत्यापन होते ही आप प्रोडक्ट लिस्ट करना शुरू कर सकते हैं।'],
+  ['Payouts run weekly to your registered bank account.', 'पेमेंट हर हफ़्ते आपके रजिस्टर्ड बैंक खाते में भेजा जाता है।'],
 ];
 
 export default function OnboardReviewPage() {
+  const { t } = useLang();
   const router = useRouter();
   const [s, setS] = useState<Onboarding | null>(null);
 
@@ -56,24 +59,24 @@ export default function OnboardReviewPage() {
         </div>
 
         <h1 className="font-display text-3xl text-ink-900">
-          {verified ? 'You\'re verified!' : rejected ? 'KYC was rejected' : 'Under review'}
+          {verified ? t('You\'re verified!', 'आप सत्यापित हो गए!') : rejected ? t('KYC was rejected', 'KYC अस्वीकृत कर दिया गया') : t('Under review', 'समीक्षा जारी है')}
         </h1>
         <p className="text-ink-700 mt-2 max-w-md mx-auto">
           {verified
-            ? 'Your shop is approved and live. Start listing your pieces.'
+            ? t('Your shop is approved and live. Start listing your pieces.', 'आपकी शॉप मंज़ूर होकर लाइव है। अपने प्रोडक्ट लिस्ट करना शुरू करें।')
             : rejected
-              ? (s.kycRejectionNote || 'Please review and resubmit your details.')
-              : `Thanks for submitting "${s.vendor.shopName}". We'll email you when review completes.`}
+              ? (s.kycRejectionNote || t('Please review and resubmit your details.', 'कृपया अपनी जानकारी जाँचकर दोबारा सबमिट करें।'))
+              : `${t('Thanks for submitting', 'सबमिट करने के लिए धन्यवाद')} "${s.vendor.shopName}". ${t('We\'ll email you when review completes.', 'समीक्षा पूरी होने पर हम आपको ईमेल करेंगे।')}`}
         </p>
 
         {!rejected && !verified && (
           <ol className="mt-6 space-y-2 text-left max-w-md mx-auto">
-            {NEXT_STEPS.map((t, i) => (
+            {NEXT_STEPS.map(([en, hi], i) => (
               <li key={i} className="flex gap-3 text-sm text-ink-700">
                 <span className="h-6 w-6 shrink-0 rounded-full bg-brand-50 text-brand-700 text-xs font-bold flex items-center justify-center">
                   {i + 1}
                 </span>
-                <span>{t}</span>
+                <span>{t(en, hi)}</span>
               </li>
             ))}
           </ol>
@@ -81,11 +84,10 @@ export default function OnboardReviewPage() {
 
         <div className="mt-7 flex items-center justify-center gap-3">
           {rejected ? (
-            <Link href="/sell/onboard" className="btn-primary">Update & resubmit</Link>
+            <Link href="/sell/onboard" className="btn-primary">{t('Update & resubmit', 'अपडेट करें और दोबारा सबमिट करें')}</Link>
           ) : (
-            <Link href="/vendor" className="btn-primary">Go to dashboard</Link>
+            <button type="button" onClick={() => goToVendorDashboard('/')} className="btn-primary">{t('Go to dashboard', 'डैशबोर्ड पर जाएं')}</button>
           )}
-          <Link href="/products" className="btn-secondary">Browse marketplace</Link>
         </div>
       </div>
     </div>
