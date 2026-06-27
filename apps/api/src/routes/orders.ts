@@ -11,7 +11,8 @@ import { priceSelection, isSystemDefaultMethodId, priceSystemDefault } from '../
 import { markItemShipped, markItemDelivered } from '../lib/fulfillmentSync';
 import { resolveCoupon, couponRedemptionOps } from '../lib/coupon';
 import { uploadBuffer } from '../lib/cloudinary';
-import { confirmOrderPaid, notifyOrderConfirmation } from '../lib/orderConfirm';
+import { confirmOrderPaid, notifyOrderConfirmation, notifyVendorsOfNewOrder } from '../lib/orderConfirm';
+import { sendOrderCancelledEmail } from '../lib/email';
 import { createInvoiceForOrder, generateInvoicePdf } from '../lib/invoice';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
@@ -614,6 +615,7 @@ router.post('/cod', checkoutLimiter, requireAuth, async (req, res) => {
   // Generate the tax invoice + send confirmation (best-effort, non-blocking).
   createInvoiceForOrder(order.id).catch((e) => console.warn('[invoice] COD generation failed:', e?.message));
   void notifyOrderConfirmation(order.id);
+  void notifyVendorsOfNewOrder(order.id);
 
   // For UPI/bank, return the public payout details so the customer can pay manually.
   res.status(201).json({ orderId: order.id, paymentInstructions: publicConfig });
@@ -769,6 +771,27 @@ router.patch(
 
     const updated = await prisma.orderItem.findUnique({ where: { id: item.id } });
     res.json(updated);
+
+    // Customer notice when a vendor cancels an item (best-effort, post-response).
+    if (status === 'CANCELLED') {
+      void (async () => {
+        try {
+          const full = await prisma.orderItem.findUnique({
+            where: { id: item.id },
+            select: { order: { select: { id: true, customer: { select: { email: true, name: true } } } } },
+          });
+          const email = full?.order.customer?.email;
+          if (email) {
+            await sendOrderCancelledEmail(email, {
+              orderId: full.order.id,
+              customerName: full.order.customer?.name || 'there',
+            });
+          }
+        } catch (e: any) {
+          console.warn('[email] cancellation notification failed:', e?.message);
+        }
+      })();
+    }
   }
 );
 

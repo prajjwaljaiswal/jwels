@@ -15,6 +15,16 @@ import { PreviewRail }   from './PreviewRail';
 
 const DRAFT_KEY = 'listing-editor:draft';
 
+interface ListingSummary {
+  id: string;
+  slug: string | null;
+  name: string;
+  price: string;
+  stockQuantity: number;
+  isActive: boolean;
+  images: string[];
+}
+
 interface ListingEditorShellProps {
   productId?: string;   // when set, the editor loads & updates this product instead of creating
 }
@@ -27,6 +37,18 @@ export function ListingEditorShell({ productId }: ListingEditorShellProps = {}) 
   const [publishing, setPublishing] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [published, setPublished] = useState<{ id?: string; name: string } | null>(null);
+  const [listings, setListings] = useState<ListingSummary[] | null>(null);
+
+  // When the success screen appears, load all the vendor's listings to show them.
+  useEffect(() => {
+    if (!published) return;
+    let active = true;
+    api<ListingSummary[]>('/api/products/vendor/mine')
+      .then((rows) => { if (active) setListings(rows); })
+      .catch(() => { if (active) setListings([]); });
+    return () => { active = false; };
+  }, [published]);
 
   useEffect(() => {
     if (isEdit) {
@@ -297,16 +319,118 @@ export function ListingEditorShell({ productId }: ListingEditorShellProps = {}) 
         toast.success(`Saved — ${result?.variations?.length ?? 0} variation(s), ${result?.variationCombos?.length ?? 0} combo(s)`);
         router.push('/vendor');
       } else {
-        await api('/api/products', { method: 'POST', body: fd });
+        const created = await api<any>('/api/products', { method: 'POST', body: fd });
         window.localStorage.removeItem(DRAFT_KEY);
         toast.success('Listing published');
-        router.push('/vendor');
+        // Show a success screen instead of redirecting away.
+        setPublished({ id: created?.id, name: draft.title });
       }
     } catch (e: any) {
       toast.error(e?.message || 'Failed to publish');
     } finally {
       setPublishing(false);
     }
+  }
+
+  function addAnother() {
+    window.localStorage.removeItem(DRAFT_KEY);
+    setDraftState(EMPTY_DRAFT);
+    setStep('media');
+    setPublished(null);
+    setListings(null);
+  }
+
+  // Success screen — shown after a new listing is published instead of redirecting.
+  // It lists ALL of the vendor's listings, with the just-added one highlighted.
+  if (published) {
+    return (
+      <div className="pb-16">
+        <div className="text-center py-10">
+          <div className="mx-auto mb-5 h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center">
+            <svg className="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="font-display text-2xl text-ink-900">Listing published</h1>
+          <p className="text-sm text-ink-500 mt-2">
+            <span className="font-semibold text-ink-700">{published.name}</span> is now live in your shop.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-2.5">
+            <button type="button" onClick={addAnother}
+              className="text-sm font-semibold px-5 h-10 rounded-pill bg-brand-600 hover:bg-brand-700 text-white transition">
+              Add another listing
+            </button>
+            <button type="button" onClick={() => router.push('/vendor')}
+              className="text-sm font-semibold px-5 h-10 rounded-pill border border-line text-ink-700 hover:border-ink-300 hover:text-ink-900 transition">
+              Go to dashboard
+            </button>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-500 mb-3">
+            Your listings{listings ? ` (${listings.length})` : ''}
+          </h2>
+          {listings === null ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-surface border border-line rounded-md overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-canvas" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3.5 bg-canvas rounded w-3/4" />
+                    <div className="h-3 bg-canvas rounded w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : listings.length === 0 ? (
+            <p className="text-sm text-ink-500">No listings yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {listings.map((p) => {
+                const isNew = published.id ? p.id === published.id : p.name === published.name;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => router.push(`/products/${p.id}/edit`)}
+                    className={[
+                      'group text-left bg-surface border rounded-md overflow-hidden transition hover:shadow-card',
+                      isNew ? 'border-emerald-400 ring-1 ring-emerald-400' : 'border-line hover:border-ink-300',
+                    ].join(' ')}
+                  >
+                    <div className="aspect-square bg-canvas overflow-hidden relative">
+                      {p.images?.[0] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.images[0]} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-ink-300 text-xs">No image</div>
+                      )}
+                      {isNew && (
+                        <span className="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill bg-emerald-500 text-white">
+                          Just added
+                        </span>
+                      )}
+                      {!p.isActive && (
+                        <span className="absolute top-2 right-2 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-pill bg-ink-900/70 text-white">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold text-ink-900 line-clamp-1">{p.name}</p>
+                      <p className="text-xs text-ink-500 mt-0.5">
+                        ₹{p.price} · {p.stockQuantity} in stock
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   const currentIdx = STEPS.findIndex((s) => s.id === step);

@@ -8,7 +8,7 @@ import { requireAuth, requireRole, requirePermission } from '../middleware/auth'
 import { razorpay, razorpayClient } from '../lib/razorpay';
 import { decryptJson } from '../lib/crypto';
 import { audit } from '../lib/audit';
-import { sendRefundEmail } from '../lib/email';
+import { sendRefundEmail, sendReturnRequestedEmail, sendReturnApprovedEmail, sendReturnRejectedEmail } from '../lib/email';
 
 const router = Router();
 
@@ -73,6 +73,26 @@ router.post('/', requireAuth, async (req, res, next) => {
       },
     });
     res.status(201).json(created);
+
+    // Confirm the request to the customer (best-effort, post-response).
+    void (async () => {
+      try {
+        const [user, prod] = await Promise.all([
+          prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true, name: true } }),
+          prisma.product.findUnique({ where: { id: item.productId }, select: { name: true } }),
+        ]);
+        if (user?.email) {
+          await sendReturnRequestedEmail(user.email, {
+            orderId: item.orderId,
+            customerName: user.name || 'there',
+            productName: prod?.name ?? 'your item',
+            reason: String(reason),
+          });
+        }
+      } catch (e: any) {
+        console.warn('[email] return requested notification failed:', e?.message);
+      }
+    })();
   } catch (e) { next(e); }
 });
 
@@ -168,6 +188,29 @@ router.patch('/:id/vendor', requireAuth, requireRole(Role.VENDOR), async (req, r
       data: { status: next2, vendorNote: parsed.data.note ?? rr.vendorNote, resolvedBy: req.user!.id },
     });
     res.json(updated);
+
+    // Notify the customer of the vendor's decision (best-effort, post-response).
+    if (next2 === ReturnStatus.APPROVED || next2 === ReturnStatus.REJECTED) {
+      void (async () => {
+        try {
+          const [customer, item] = await Promise.all([
+            prisma.user.findUnique({ where: { id: rr.customerId }, select: { email: true, name: true } }),
+            prisma.orderItem.findUnique({ where: { id: rr.orderItemId }, select: { product: { select: { name: true } } } }),
+          ]);
+          if (customer?.email) {
+            const productName = item?.product?.name ?? 'your item';
+            const customerName = customer.name || 'there';
+            if (next2 === ReturnStatus.APPROVED) {
+              await sendReturnApprovedEmail(customer.email, { orderId: rr.orderId, customerName, productName });
+            } else {
+              await sendReturnRejectedEmail(customer.email, { orderId: rr.orderId, customerName, productName, reason: updated.vendorNote });
+            }
+          }
+        } catch (e: any) {
+          console.warn('[email] return decision notification failed:', e?.message);
+        }
+      })();
+    }
   } catch (e) { next(e); }
 });
 

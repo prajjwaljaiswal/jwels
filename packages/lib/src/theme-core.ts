@@ -63,6 +63,7 @@ export interface VendorBrand {
   tagline: string | null;
   description: string | null;
   themeColor: string | null;
+  currency?: string | null; // store display currency (INR | USD | GBP | EUR | AED); defaults to INR
   theme?: Partial<VendorTheme> | null;
 }
 

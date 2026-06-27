@@ -7,7 +7,7 @@ import { prisma } from '../lib/prisma';
 import { signToken } from '../lib/jwt';
 import { requireAuth, loadPermissions } from '../middleware/auth';
 import { authLimiter, sensitiveAuthLimiter } from '../middleware/rateLimit';
-import { sendPasswordResetEmail } from '../lib/email';
+import { sendPasswordResetEmail, sendWelcomeEmail, sendPasswordResetConfirmationEmail } from '../lib/email';
 
 const router = Router();
 
@@ -39,6 +39,12 @@ router.post('/register', sensitiveAuthLimiter, async (req, res) => {
     token,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
+
+  // Welcome email — best-effort, fired after responding so it never delays signup.
+  if (user.role === 'CUSTOMER' || user.role === 'VENDOR') {
+    void sendWelcomeEmail(user.email, { name: user.name, role: user.role })
+      .catch((e) => console.warn('[email] welcome failed:', e?.message));
+  }
 });
 
 const loginSchema = z.object({
@@ -104,6 +110,7 @@ router.post('/google', authLimiter, async (req, res) => {
   if (!info.email || !verified) return res.status(401).json({ error: 'Email not verified by Google' });
 
   let user = await prisma.user.findUnique({ where: { email: info.email } });
+  const isNewUser = !user;
   if (!user) {
     // First-time Google sign-in: create a passwordless account (random hash).
     const placeholder = await bcrypt.hash(`google:${info.sub}:${Date.now()}`, 10);
@@ -122,6 +129,12 @@ router.post('/google', authLimiter, async (req, res) => {
     token,
     user: { id: user.id, name: user.name, email: user.email, role: user.role },
   });
+
+  // Welcome email only for brand-new accounts (best-effort, post-response).
+  if (isNewUser && (user.role === 'CUSTOMER' || user.role === 'VENDOR')) {
+    void sendWelcomeEmail(user.email, { name: user.name, role: user.role })
+      .catch((e) => console.warn('[email] welcome failed:', e?.message));
+  }
 });
 
 router.get('/me', requireAuth, async (req, res) => {
@@ -240,6 +253,10 @@ router.post('/reset-password', sensitiveAuthLimiter, async (req, res) => {
   });
 
   res.json({ message: 'Password reset successful.' });
+
+  // Security notice — confirm the change (best-effort, post-response).
+  void sendPasswordResetConfirmationEmail(user.email, { name: user.name })
+    .catch((e) => console.warn('[email] password reset confirmation failed:', e?.message));
 });
 
 export default router;

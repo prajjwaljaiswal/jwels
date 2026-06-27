@@ -8,6 +8,15 @@ import { audit } from '../lib/audit';
 import { uniqueVendorSlug } from '../lib/vendor-slug';
 import { indexProduct, removeProductFromIndex } from '../lib/algolia';
 import { runSettlement, markPayoutPaid } from '../lib/payouts';
+import {
+  sendVendorApprovedEmail,
+  sendVendorRejectedEmail,
+  sendVendorSuspendedEmail,
+  sendKycApprovedEmail,
+  sendKycRejectedEmail,
+  sendProductApprovedEmail,
+  sendProductRejectedEmail,
+} from '../lib/email';
 
 const router = Router();
 // All admin routes require an authenticated ADMIN user; per-route permission
@@ -43,8 +52,12 @@ router.patch(
       return res.status(403).json({ error: 'Forbidden', missingPermissions: [needed] });
     }
 
-    const existingVendor = await prisma.vendor.findUnique({ where: { id: req.params.id } });
+    const existingVendor = await prisma.vendor.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { email: true, name: true } } },
+    });
     if (!existingVendor) return res.status(404).json({ error: 'Vendor not found' });
+    const prevStatus = existingVendor.status;
 
     const data: any = { status: parsed.data.status as VendorStatus };
     // Auto-assign a slug on first approval so the storefront has a clean URL.
@@ -57,6 +70,23 @@ router.patch(
       status: parsed.data.status,
     });
     res.json(vendor);
+
+    // Notify the vendor only when the status actually changes (best-effort, post-response).
+    const email = existingVendor.user?.email;
+    if (email && parsed.data.status !== prevStatus) {
+      const contactName = existingVendor.user?.name ?? undefined;
+      const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:3000';
+      const storeUrl = `${webOrigin}/store/${vendor.slug ?? vendor.id}`;
+      const notify =
+        parsed.data.status === 'APPROVED'
+          ? sendVendorApprovedEmail(email, { shopName: vendor.shopName, contactName, storeUrl })
+          : parsed.data.status === 'REJECTED'
+          ? sendVendorRejectedEmail(email, { shopName: vendor.shopName, contactName })
+          : parsed.data.status === 'SUSPENDED'
+          ? sendVendorSuspendedEmail(email, { shopName: vendor.shopName, contactName })
+          : null; // PENDING reset → no email
+      if (notify) void notify.catch((e: any) => console.warn('[email] vendor status notification failed:', e?.message));
+    }
   },
 );
 
@@ -89,8 +119,12 @@ router.patch('/vendors/:id/kyc', requirePermission(Permission.VENDOR_APPROVE), a
   const parsed = kycDecisionSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const existing = await prisma.vendor.findUnique({ where: { id: req.params.id } });
+  const existing = await prisma.vendor.findUnique({
+    where: { id: req.params.id },
+    include: { user: { select: { email: true, name: true } } },
+  });
   if (!existing) return res.status(404).json({ error: 'Vendor not found' });
+  const prevKyc = existing.kycStatus;
 
   const data: any = {
     kycStatus: parsed.data.decision as KycStatus,
@@ -99,7 +133,8 @@ router.patch('/vendors/:id/kyc', requirePermission(Permission.VENDOR_APPROVE), a
     kycReviewedBy: req.user!.id,
   };
   // On verify, also promote the shop to APPROVED if it was still PENDING.
-  if (parsed.data.decision === 'VERIFIED' && existing.status === VendorStatus.PENDING) {
+  const autoPromoted = parsed.data.decision === 'VERIFIED' && existing.status === VendorStatus.PENDING;
+  if (autoPromoted) {
     data.status = VendorStatus.APPROVED;
     if (!existing.slug) data.slug = await uniqueVendorSlug(existing.shopName);
   }
@@ -109,6 +144,27 @@ router.patch('/vendors/:id/kyc', requirePermission(Permission.VENDOR_APPROVE), a
     note: parsed.data.note,
   });
   res.json(vendor);
+
+  // Notify the vendor of the KYC decision (best-effort, only on a real change).
+  const kycEmail = existing.user?.email;
+  if (kycEmail && parsed.data.decision !== prevKyc) {
+    const contactName = existing.user?.name ?? undefined;
+    let notify: Promise<void>;
+    if (parsed.data.decision === 'VERIFIED') {
+      // When verification also takes the shop live, the go-live email is the single
+      // most relevant message; otherwise send the plain KYC-verified note.
+      notify = autoPromoted
+        ? sendVendorApprovedEmail(kycEmail, {
+            shopName: vendor.shopName,
+            contactName,
+            storeUrl: `${process.env.WEB_ORIGIN || 'http://localhost:3000'}/store/${vendor.slug ?? vendor.id}`,
+          })
+        : sendKycApprovedEmail(kycEmail, { shopName: vendor.shopName, contactName });
+    } else {
+      notify = sendKycRejectedEmail(kycEmail, { shopName: vendor.shopName, contactName, note: parsed.data.note });
+    }
+    void notify.catch((e: any) => console.warn('[email] kyc decision notification failed:', e?.message));
+  }
 });
 
 // ── CATEGORY PROPOSAL REVIEW ─────────────────────────────────────────────────
@@ -330,7 +386,14 @@ router.patch('/products/:id/moderate', requirePermission(Permission.PRODUCT_MODE
   try {
     const parsed = moderateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const product = await prisma.product.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        vendor: { select: { shopName: true, user: { select: { email: true, name: true } } } },
+      },
+    });
     if (!product) return res.status(404).json({ error: 'Product not found' });
 
     const approve = parsed.data.action === 'approve';
@@ -346,6 +409,16 @@ router.patch('/products/:id/moderate', requirePermission(Permission.PRODUCT_MODE
 
     await audit(req.user!.id, approve ? 'PRODUCT_APPROVE' : 'PRODUCT_REJECT', product.id, { note: parsed.data.note });
     res.json(updated);
+
+    // Notify the vendor of the moderation decision (best-effort, post-response).
+    const vendorEmail = product.vendor?.user?.email;
+    if (vendorEmail) {
+      const shopName = product.vendor!.shopName;
+      const notify = approve
+        ? sendProductApprovedEmail(vendorEmail, { shopName, productName: product.name })
+        : sendProductRejectedEmail(vendorEmail, { shopName, productName: product.name, note: parsed.data.note });
+      void notify.catch((e: any) => console.warn('[email] product moderation notification failed:', e?.message));
+    }
   } catch (e) { next(e); }
 });
 

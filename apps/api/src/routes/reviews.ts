@@ -5,6 +5,7 @@ import { OrderStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
 import { uploadBuffer } from '../lib/cloudinary';
+import { sendReviewSubmittedEmail } from '../lib/email';
 
 const router = Router();
 
@@ -174,6 +175,27 @@ router.post('/', requireAuth, upload.array('media', 4), async (req, res, next) =
     });
 
     res.status(201).json(review);
+
+    // Notify the product's vendor of the new review (best-effort, post-response).
+    void (async () => {
+      try {
+        const product = await prisma.product.findUnique({
+          where: { id: productId },
+          select: { name: true, vendor: { select: { shopName: true, user: { select: { email: true } } } } },
+        });
+        const email = product?.vendor?.user?.email;
+        if (email) {
+          await sendReviewSubmittedEmail(email, {
+            shopName: product!.vendor!.shopName,
+            productName: product!.name,
+            rating,
+            reviewerName: review.customer?.name ?? undefined,
+          });
+        }
+      } catch (e: any) {
+        console.warn('[email] review notification failed:', e?.message);
+      }
+    })();
   } catch (e) {
     next(e);
   }

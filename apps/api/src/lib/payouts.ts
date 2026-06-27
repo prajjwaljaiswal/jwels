@@ -1,5 +1,6 @@
 import { OrderStatus, PayoutStatus } from '@prisma/client';
 import { prisma } from './prisma';
+import { sendPayoutPaidEmail } from './email';
 
 // Vendor payout settlement.
 //
@@ -117,7 +118,7 @@ export async function markPayoutPaid(
   const provider = getPayoutProvider(opts.provider ?? payout.provider);
   const result = await provider.pay({ payoutId: payout.id, vendorId: payout.vendorId, amount: Number(payout.netAmount) });
 
-  return prisma.payout.update({
+  const updated = await prisma.payout.update({
     where: { id: payout.id },
     data: {
       status: PayoutStatus.PAID,
@@ -128,5 +129,23 @@ export async function markPayoutPaid(
       processedAt: new Date(),
       processedBy: opts.processedBy,
     },
+    include: {
+      vendor: { select: { shopName: true, user: { select: { email: true, name: true } } } },
+      _count: { select: { items: true } },
+    },
   });
+
+  // Notify the vendor their payout was sent (best-effort — never blocks settlement).
+  const email = updated.vendor?.user?.email;
+  if (email) {
+    void sendPayoutPaidEmail(email, {
+      shopName: updated.vendor.shopName,
+      contactName: updated.vendor.user?.name ?? undefined,
+      amountLabel: `₹${Number(updated.netAmount).toLocaleString('en-IN')}`,
+      utr: updated.utr,
+      itemCount: updated._count.items,
+    }).catch((e: any) => console.warn('[email] payout paid notification failed:', e?.message));
+  }
+
+  return updated;
 }

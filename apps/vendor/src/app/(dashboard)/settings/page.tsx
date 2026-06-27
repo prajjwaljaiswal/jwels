@@ -964,12 +964,43 @@ const CURRENCY_DESCRIPTIONS: Record<CurrencyCode, string> = {
 
 function PreferencesTab() {
   const { code, setCode } = useCurrency();
+  const [saving, setSaving] = useState<CurrencyCode | null>(null);
+
+  // Seed the selection from the store's saved currency (server-side), so the
+  // dashboard reflects what the storefront will actually show.
+  useEffect(() => {
+    let active = true;
+    api<{ currency?: string }>('/api/vendors/me')
+      .then((v) => {
+        if (active && v?.currency && v.currency in CURRENCIES) setCode(v.currency as CurrencyCode);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [setCode]);
+
+  async function selectCurrency(c: CurrencyCode) {
+    if (c === code || saving) return;
+    setSaving(c);
+    const prev = code;
+    setCode(c); // optimistic — updates dashboard display immediately
+    try {
+      const fd = new FormData();
+      fd.append('currency', c);
+      await api('/api/vendors/me/settings', { method: 'PATCH', body: fd });
+      toast.success(`Store currency set to ${c}`);
+    } catch (e: any) {
+      setCode(prev); // roll back on failure
+      toast.error(e?.message || 'Could not save currency');
+    } finally {
+      setSaving(null);
+    }
+  }
 
   return (
     <Card className="p-5">
       <h2 className="font-semibold text-ink-900 mb-1">Display preferences</h2>
       <p className="text-xs text-ink-500 mb-5">
-        These settings affect how prices are displayed across the dashboard and storefront.
+        These settings affect how prices are displayed across the dashboard and your storefront.
         Prices are stored in INR — this is a display-only conversion.
       </p>
 
@@ -983,14 +1014,14 @@ function PreferencesTab() {
                 code === c
                   ? 'border-brand-400 bg-brand-50'
                   : 'border-line bg-surface hover:bg-canvas'
-              }`}
+              } ${saving ? 'opacity-60 pointer-events-none' : ''}`}
             >
               <input
                 type="radio"
                 name="currency"
                 className="accent-brand-600"
                 checked={code === c}
-                onChange={() => setCode(c)}
+                onChange={() => selectCurrency(c)}
               />
               <span className="text-xl w-8 text-center">{symbol}</span>
               <div>
@@ -999,14 +1030,14 @@ function PreferencesTab() {
               </div>
               {code === c && (
                 <span className="ml-auto text-xs font-semibold text-brand-700 bg-brand-100 px-2 py-0.5 rounded-pill">
-                  Active
+                  {saving === c ? 'Saving…' : 'Active'}
                 </span>
               )}
             </label>
           ))}
         </div>
         <p className="text-[11px] text-ink-500 mt-3">
-          Your preference is saved in your browser. Switching devices will reset to INR.
+          This is your store&rsquo;s currency — your storefront and the dashboard will show prices in it.
         </p>
       </div>
     </Card>

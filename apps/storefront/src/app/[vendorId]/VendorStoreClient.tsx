@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useCart } from '@/lib/cart';
+import { useCurrency, CURRENCIES, type CurrencyCode } from '@/lib/currency';
 import {
   VendorProvider, VendorBrand, FONT_STACKS, useVendor, SocialPlatform,
 } from '@/lib/vendor-context';
@@ -32,6 +33,17 @@ export default function VendorStoreClient({
   isCustomHost: boolean;
   children: React.ReactNode;
 }) {
+  // The storefront always displays prices in the store's chosen currency (set by the
+  // vendor in their dashboard). There's no per-shopper switcher here, so force the
+  // currency store to the vendor's currency on every load, overriding any stale
+  // localStorage value from a previously-visited store.
+  const setCode = useCurrency((s) => s.setCode);
+  useEffect(() => {
+    const code = vendor.currency as CurrencyCode | undefined;
+    if (code && code in CURRENCIES) setCode(code);
+    else setCode('INR');
+  }, [vendor.currency, setCode]);
+
   return (
     <VendorProvider vendor={vendor} isCustomHost={isCustomHost}>
       <NotificationsProvider>

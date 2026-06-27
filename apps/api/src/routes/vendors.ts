@@ -12,6 +12,7 @@ import { isValidVendorSlug, RESERVED_VENDOR_SLUGS, RESERVED_SUBDOMAINS, resolveV
 import { listPresets, getPreset, SYSTEM_TITLES, type SystemPageKind } from '../lib/themePresets';
 import { SYSTEM_PAGE_SLUGS } from '../lib/blockSchemas';
 import { notifyStorefrontRevalidate } from '../lib/revalidate';
+import { sendVendorOnboardingSubmittedEmail } from '../lib/email';
 
 const router = Router();
 
@@ -86,6 +87,7 @@ const settingsSchema = z.object({
   description:  z.string().max(1000).optional(),
   address:      z.string().optional(),
   themeColor:   hex.optional(),
+  currency:     z.enum(['INR', 'USD', 'GBP', 'EUR', 'AED']).optional(),
   customDomain: z.string().max(253).optional().transform((v) => v?.trim().toLowerCase() || undefined),
   theme:        z.string().optional(), // JSON string from multipart form
 });
@@ -268,6 +270,18 @@ router.post('/onboard/submit', requireAuth, requireRole(Role.VENDOR), async (req
     },
   });
   res.json(vendorPublicView(updated));
+
+  // "Application received, under review" — best-effort, after responding.
+  void (async () => {
+    try {
+      const user = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true, name: true } });
+      if (user?.email) {
+        await sendVendorOnboardingSubmittedEmail(user.email, { shopName: updated.shopName, contactName: user.name });
+      }
+    } catch (e: any) {
+      console.warn('[email] onboarding submitted failed:', e?.message);
+    }
+  })();
 });
 
 // Vendor onboard (legacy single-form profile create/update — kept for backward compat)
@@ -346,8 +360,12 @@ router.patch(
         );
       }
 
-      // Final ordered array: kept existing + newly uploaded (max 5)
-      updates.bannerUrls = [...keepUrls, ...newBannerUrls].slice(0, 5);
+      // Final ordered array: kept existing + newly uploaded (max 5). Only touch
+      // bannerUrls when the client actually sent banner data — otherwise a partial
+      // PATCH (e.g. currency-only from the Preferences tab) would wipe the banners.
+      if (req.body.keepBannerUrls !== undefined || newBannerUrls.length > 0) {
+        updates.bannerUrls = [...keepUrls, ...newBannerUrls].slice(0, 5);
+      }
 
       // Check custom domain uniqueness if provided
       if (updates.customDomain) {
@@ -963,7 +981,7 @@ router.get('/:vendorId/brand', async (req, res) => {
     where: { id },
     select: {
       id: true, slug: true, shopName: true, shopLogoUrl: true, bannerUrls: true,
-      tagline: true, description: true, themeColor: true, theme: true, themePresetKey: true,
+      tagline: true, description: true, themeColor: true, currency: true, theme: true, themePresetKey: true,
       subdomain: true, customDomain: true, customDomainStatus: true, themeVersion: true, status: true,
     },
   });

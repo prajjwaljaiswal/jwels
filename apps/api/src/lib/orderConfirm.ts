@@ -1,7 +1,7 @@
 import { OrderStatus } from '@prisma/client';
 import { prisma } from './prisma';
 import { createInvoiceForOrder } from './invoice';
-import { sendOrderConfirmationEmail } from './email';
+import { sendOrderConfirmationEmail, sendNewOrderVendorEmail } from './email';
 
 /**
  * Best-effort order-confirmation email. Never throws.
@@ -29,6 +29,55 @@ export async function notifyOrderConfirmation(orderId: string): Promise<void> {
     });
   } catch (e: any) {
     console.warn('[email] order confirmation failed:', e?.message);
+  }
+}
+
+/**
+ * Best-effort "you have a new order" email to each vendor with items in the order.
+ * Grouped per vendor (split-vendor orders get one email each). Never throws.
+ */
+export async function notifyVendorsOfNewOrder(orderId: string): Promise<void> {
+  try {
+    const o = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            product: { select: { name: true } },
+            vendor: { select: { id: true, shopName: true, user: { select: { email: true, name: true } } } },
+          },
+        },
+      },
+    });
+    if (!o) return;
+    const city = (o.shippingAddress as any)?.city ?? null;
+
+    // Group items by vendor so each seller gets one email for their part of the order.
+    const byVendor = new Map<string, { email: string; shopName: string; items: typeof o.items }>();
+    for (const it of o.items) {
+      const email = it.vendor?.user?.email;
+      if (!email) continue;
+      const entry = byVendor.get(it.vendorId) ?? { email, shopName: it.vendor!.shopName, items: [] as typeof o.items };
+      entry.items.push(it);
+      byVendor.set(it.vendorId, entry);
+    }
+
+    for (const { email, shopName, items } of byVendor.values()) {
+      const subtotal = items.reduce((s, it) => s + Number(it.priceAtPurchase) * it.quantity, 0);
+      await sendNewOrderVendorEmail(email, {
+        orderId: o.id,
+        shopName,
+        items: items.map((it) => ({
+          name: it.product?.name ?? 'Item',
+          quantity: it.quantity,
+          priceLabel: `₹${Number(it.priceAtPurchase).toLocaleString('en-IN')}`,
+        })),
+        subtotalLabel: `₹${subtotal.toLocaleString('en-IN')}`,
+        customerCity: city,
+      });
+    }
+  } catch (e: any) {
+    console.warn('[email] vendor new-order notification failed:', e?.message);
   }
 }
 
@@ -81,5 +130,6 @@ export async function confirmOrderPaid(opts: {
   // Post-commit, best-effort: generate the tax invoice and email the customer.
   try { await createInvoiceForOrder(order.id); } catch (e: any) { console.warn('[invoice] generation failed:', e?.message); }
   void notifyOrderConfirmation(order.id);
+  void notifyVendorsOfNewOrder(order.id);
   return { ok: true, alreadyProcessed: false };
 }

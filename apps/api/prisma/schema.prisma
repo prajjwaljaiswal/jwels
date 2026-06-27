@@ -333,6 +333,7 @@ model Vendor {
   description  String?
   address      String?
   themeColor   String?      @default("#F1641E")
+  currency     String       @default("INR") // display currency for this store's storefront (INR | USD | GBP | EUR | AED)
   theme        Json?        // full vendor theme config: colors, typography, header & footer content
   themePresetKey String?    // null = custom; otherwise "classic" | "modern" | "minimal" | "luxury" | "boutique"
   customDomain String?      @unique

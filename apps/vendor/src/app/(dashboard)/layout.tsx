@@ -12,7 +12,7 @@ import { setToken } from '@/lib/api';
 const NAV: NavItem[] = [
   { label: 'Dashboard',       href: '/',               icon: Icons.Home,     match: (p) => p === '/' },
   { label: 'Analytics',       href: '/analytics',      icon: Icons.Chart,    match: (p) => p.startsWith('/analytics') },
-  { label: 'Listings',        href: '/products/new',   icon: Icons.Tag,      match: (p) => p.startsWith('/products') },
+  { label: 'Listings',        href: '/products',       icon: Icons.Tag,      match: (p) => p.startsWith('/products') },
   { label: 'Inventory',       href: '/inventory',      icon: Icons.Box,      match: (p) => p.startsWith('/inventory') },
   { label: 'Sections',        href: '/sections',       icon: Icons.Layers,   match: (p) => p.startsWith('/sections') },
   { label: 'Categories',      href: '/categories',     icon: Icons.Layers,   match: (p) => p.startsWith('/categories') },

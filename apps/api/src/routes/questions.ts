@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Role } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { requireAuth, requireRole } from '../middleware/auth';
+import { sendQuestionAnsweredEmail } from '../lib/email';
 
 const router = Router();
 
@@ -115,6 +116,26 @@ router.post('/:id/answer', requireAuth, requireRole(Role.VENDOR), async (req, re
       createdAt: updated.createdAt,
       answeredAt: updated.answeredAt,
     });
+
+    // Notify the asker their question was answered (best-effort, post-response).
+    void (async () => {
+      try {
+        const [asker, product] = await Promise.all([
+          prisma.user.findUnique({ where: { id: q.askedById }, select: { email: true, name: true } }),
+          prisma.product.findUnique({ where: { id: q.productId }, select: { name: true } }),
+        ]);
+        if (asker?.email) {
+          await sendQuestionAnsweredEmail(asker.email, {
+            customerName: q.askedByName || asker.name || 'there',
+            productName: product?.name ?? 'a product',
+            question: q.question,
+            answer: updated.answer ?? body.answer,
+          });
+        }
+      } catch (e: any) {
+        console.warn('[email] question answered notification failed:', e?.message);
+      }
+    })();
   } catch (e) {
     if (e instanceof z.ZodError) return res.status(400).json({ error: 'Invalid input', details: e.errors });
     next(e);

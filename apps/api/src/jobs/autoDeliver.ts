@@ -1,6 +1,7 @@
 import { OrderStatus, ShipmentStatus } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { isDbConnectionError } from '../lib/prisma-errors';
+import { markItemDelivered } from '../lib/fulfillmentSync';
 
 // Delivery confirmation policy:
 //   • Tracked shipments (a Shipment row exists) are closed ONLY on a real
@@ -17,28 +18,39 @@ const SCAN_INTERVAL_MS = 60 * 60 * 1000;                          // every 1 hou
 const DELIVERED_STATUSES = [ShipmentStatus.DELIVERED, ShipmentStatus.COMPLETED];
 
 export async function autoDeliverShippedItems(now: Date = new Date()): Promise<number> {
+  const untrackedCutoff = new Date(now.getTime() - UNTRACKED_AUTO_DELIVER_AFTER_MS);
+
   // 1) Reconcile: the carrier/vendor confirmed delivery but the OrderItem wasn't
   //    synced (e.g. a future tracking-sync updated the Shipment directly). Close
   //    these on the real signal, regardless of elapsed time.
-  const confirmed = await prisma.orderItem.updateMany({
+  const confirmed = await prisma.orderItem.findMany({
     where: {
       status: OrderStatus.SHIPPED,
       shipment: { status: { in: DELIVERED_STATUSES } },
     },
-    data: { status: OrderStatus.DELIVERED, deliveredAt: now },
+    select: { id: true },
   });
 
   // 2) Untracked fallback: no carrier shipment exists, so a timer is the only
   //    available signal. Close after the (longer) grace window.
-  const untrackedCutoff = new Date(now.getTime() - UNTRACKED_AUTO_DELIVER_AFTER_MS);
-  const untracked = await prisma.orderItem.updateMany({
+  const untracked = await prisma.orderItem.findMany({
     where: {
       status: OrderStatus.SHIPPED,
       dispatchedAt: { lt: untrackedCutoff },
       shipment: { is: null },
     },
-    data: { status: OrderStatus.DELIVERED, deliveredAt: now },
+    select: { id: true },
   });
+
+  // Funnel both sets through the canonical transition so the "delivered" email
+  // fires and any linked Shipment advances — exactly once per item (idempotent).
+  // (The previous bulk updateMany bypassed this and sent no notification.)
+  const ids = [...confirmed, ...untracked].map((i) => i.id);
+  let delivered = 0;
+  for (const id of ids) {
+    const { changed } = await markItemDelivered(id);
+    if (changed) delivered += 1;
+  }
 
   // 3) Visibility: tracked shipments dispatched long ago but still not marked
   //    delivered are HELD (not auto-closed) and need ops attention.
@@ -55,7 +67,7 @@ export async function autoDeliverShippedItems(now: Date = new Date()): Promise<n
     );
   }
 
-  return confirmed.count + untracked.count;
+  return delivered;
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
